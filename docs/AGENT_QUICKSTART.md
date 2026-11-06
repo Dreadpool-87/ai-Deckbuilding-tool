@@ -1,11 +1,11 @@
 # Quickstart for a Python-capable AI agent
 
-**Status: agent guidance for the existing Casual private beta, not a new executable API.**
+**Status:** Public test preview. The primary workflow targets Casual 60+ card decks.
 Read the short `AGENTS.md` first. If the runtime or actual collection is unavailable, say so rather than presenting imaginary execution.
 
 ## Experimental Gateway
 
-Use the standard-library dispatch interface when the current agent can execute local Python and all required inputs have actually been mounted. The examples below are for the documented **pinned slim Oracle / GitHub-main Validator** environment, not a generic source migration:
+Use the standard-library dispatch interface when the current agent can execute local Python and all required inputs have actually been mounted. The following commands use the pinned slim Oracle and the public repository Validator.
 
 ```sh
 python tools/agent_gateway.py doctor --oracle /private/AtomicCards_slim_v2.json.gz
@@ -17,7 +17,7 @@ The confirmation flag is **only a caller declaration**, not cryptographic proof 
 
 ## Common JSON result contract
 
-All `doctor`, `discover` and `validate` gateway JSON responses now include `schema_version: 1`, one authoritative top-level `status`, `executed`/`tool_execution`, `sources`, `evidence.facts`, `evidence.derivations`, `evidence.hypotheses`, `reason_codes`, `uncertainties`, and `limitations`. Positive swap and strategic-improvement flags always remain `false`. The older P2 `result`/`checks` fields are preserved for compatibility.
+All `doctor`, `discover` and `validate` gateway JSON responses now include `schema_version: 1`, one authoritative top-level `status`, `executed`/`tool_execution`, `child_exit_code` (or `null` if unavailable), `sources`, `evidence.facts`, `evidence.derivations`, `evidence.hypotheses`, `reason_codes`, `uncertainties`, and `limitations`. Positive swap and strategic-improvement flags always remain `false`. The older P2 `result`/`checks` fields are preserved for compatibility.
 
 For full status, exit-code and privacy rules, read [Agent Gateway Result Contract v1](AGENT_RESULT_CONTRACT_V1.md) and the [JSON Schema](../schemas/agent_gateway_result_v1.schema.json). If a child script starts but fails to produce trustworthy JSON, the gateway returns `UNVERIFIED` with `FAILED_AFTER_START`. Do not infer deck quality, real collection authentication or strategic improvement from a successful action.
 
@@ -35,7 +35,7 @@ The Gateway pins Card Search v0.3 by SHA-256, and `doctor` now reports `checks.c
 
 ## 1. Detect the environment
 
-- Intended repository: `Dreadpool-87/ai-Deckbuilding-tool`, Python 3.9+ for the existing search tools; verify the actual installed runtime.
+- Intended repository: `Dreadpool-87/ai-Deckbuilding-tool`, Python 3.12 is recommended. Verify the actual installed runtime.
 - Intended inputs: readable MTGJSON AtomicCards `.json`/`.json.gz`, an explicitly confirmed current-run `Name,Quantity` collection CSV, optional user goal and an existing or candidate deck.
 - The Oracle source, Validator variant, collection and output must be read from the **actual runtime**. Verify their integrity and applicable hashes before making verified claims.
 - Never assume that code in GitHub, ChatGPT Project Sources or a prior conversation is mounted in the current runtime.
@@ -78,7 +78,7 @@ python validator/MTG_Deck_Validator_v1.1.1.py --collection /private/CURRENT_COLL
 
 Only add `--exact-60` when exactly 60 was required; Casual itself allows 60 or more cards. Inspect the actual process exit code and reported `status`, `checks`, `failures`, `uncertainties`, `mana_curve_integrity` and `prepare_layout_audit`. A valid deck does not establish optimal strategy or win rate.
 
-**Version trap:** GitHub `main`'s Validator SHA-256 is documented as `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef`. The separately selected ChatGPT Project Prepare candidate is `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d`. The frozen old beta/Swap Advisor pin is `8749b50d0aeaa52124a99271a0ab40bcc979350c6e8b5e9074c4f28d63a3d1ac`. These are **documented expected values, not hashes verified by this quickstart**. Re-read `PROJECT_STATUS.md` and actually hash the selected bytes. Never silently substitute one variant for another.
+**Source selection:** Check the [active source pins](AGENT_SOURCE_COMPATIBILITY_P4.md) and hash the actual bytes. The public checkout, ChatGPT Project Prepare candidate, and frozen beta use separate pins.
 
 ## 4. Optional testing and swap discussion
 

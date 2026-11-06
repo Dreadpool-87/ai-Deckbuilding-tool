@@ -1,6 +1,8 @@
 # MTG Deck Validator v1.1: User Guide (Historical Version)
 
-> **Current guidance (2026-11-01):** This is the **historical v1.1 guide**; the original v1.1 commands below remain historical only. For new GitHub Casual Beta v0.2 validations, use [Validator v1.1.1 with Prepare Color Integrity](../validator/MTG_Deck_Validator_v1.1.1.py), SHA-256 `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef`, with the corrected docstring command `python validator/MTG_Deck_Validator_v1.1.1.py --help`. Its functional behavior is unchanged from Project Prepare SHA-256 `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d` but the source files are not byte-identical. The original 2026-10-22 frozen beta Validator stays at SHA-256 `8749b50d0aeaa52124a99271a0ab40bcc979350c6e8b5e9074c4f28d63a3d1ac`. Inspect `prepare_layout_audit` and all gates; see [the Beta v0.2 release definition](releases/CASUAL_PRIVATE_BETA_v0.2_2026-11-01.md).
+> **Historical v1.1 guide.** For current public testing, run `python validator/MTG_Deck_Validator_v1.1.1.py --help` and see the [quickstart](AGENT_QUICKSTART.md) and [source pins](AGENT_SOURCE_COMPATIBILITY_P4.md). The [private beta release record](releases/CASUAL_PRIVATE_BETA_v0.2_2026-11-01.md) preserves the historical hash and rollback context.
+
+The active Validator reads `4 Lightning Bolt`, `4x Lightning Bolt`, `4× Lightning Bolt`, and `4×Lightning Bolt`. Put a space after an attached ASCII `x` or `X`. With a space after the quantity, the following text is the card name, so `4 Xenagos, God of Revels` preserves the initial X. Write `4x Lightning Bolt` when importing a list with a separated ASCII marker such as `4 x Lightning Bolt`.
 
 **One reusable Python file:** `validator/MTG_Deck_Validator_v1.1.py` in this repository.
 

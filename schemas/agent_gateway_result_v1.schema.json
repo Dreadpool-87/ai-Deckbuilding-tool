@@ -47,7 +47,7 @@
     },
     "executed": {
       "type": "boolean",
-      "description": "Whether an actual downstream child tool was started; doctor is not child execution."
+      "description": "Whether the downstream process was launched; doctor is a local readiness check."
     },
     "tool_execution": {
       "enum": [
@@ -55,6 +55,18 @@
         "EXECUTED",
         "FAILED_AFTER_START"
       ]
+    },
+    "child_exit_code": {
+      "type": ["integer", "null"],
+      "description": "Observed downstream process exit code, including termination after timeout when available; null when no child started."
+    },
+    "validator_version": {
+      "type": ["string", "null"],
+      "description": "Version of the source identified by a matching Validator pin, independent of execution."
+    },
+    "card_search_sha256": {
+      "$ref": "#/$defs/hashOrNull",
+      "description": "Verified Card Search source digest when checked; a matching digest is not execution evidence."
     },
     "sources": {
       "type": "object",
@@ -219,6 +231,9 @@
           },
           "tool_execution": {
             "const": "NOT_EXECUTED"
+          },
+          "child_exit_code": {
+            "type": "null"
           }
         }
       }
@@ -235,6 +250,9 @@
         "properties": {
           "tool_execution": {
             "const": "NOT_EXECUTED"
+          },
+          "child_exit_code": {
+            "type": "null"
           }
         }
       }

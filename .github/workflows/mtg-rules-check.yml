@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - name: Inspect official rules sources
@@ -28,6 +28,8 @@ jobs:
         run: python scripts/check_mtg_rules.py
       - name: Report proposed changes without pushing
         shell: bash
+        env:
+          RULES_CHANGE_TYPE: ${{ steps.inspect.outputs.change_type }}
         run: |
           set -euo pipefail
           if git diff --quiet -- rules/manifest.json rules/CHANGELOG.md; then
@@ -43,7 +45,7 @@ jobs:
             git diff -- rules/manifest.json rules/CHANGELOG.md
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
-          if [[ "${{ steps.inspect.outputs.change_type }}" == "html_review" ]]; then
+          if [[ "$RULES_CHANGE_TYPE" == "html_review" ]]; then
             {
               echo "### HTML_ONLY_REVIEW_REQUIRED"
               echo "Only the raw HTML of recognized official source pages changed."

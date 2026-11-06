@@ -10,11 +10,11 @@ Python-capable AI agents must choose the *actual* Validator file selected for th
 
 | `--validator-profile` | Expected SHA-256 of local Validator bytes | Source and status | P4 execution evidence |
 | --- | --- | --- | --- |
-| `github-main-v0.2` (default) | `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef` | `MTG-Deck-Tools/main`: `validator/MTG_Deck_Validator_v1.1.1.py`; Casual private beta v0.2 | CI synthetic integration tested |
+| `github-main-v0.2` (default) | `ffe3f958c342b70804941e6cec6604544d027cb8141aaf502f7749120f76bac0` | Public preview checkout, `validator/MTG_Deck_Validator_v1.1.1.py` | [Synthetic verification](PUBLIC_PREVIEW_AUDIT.md) |
 | `project-prepare-candidate` | `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d` | Separately managed ChatGPT Project Source, *not automatically synchronized* | **NOT_TESTED with this gateway**; the actual Project Source binary was not supplied to CI |
 | `frozen-beta-20261022` | `8749b50d0aeaa52124a99271a0ab40bcc979350c6e8b5e9074c4f28d63a3d1ac` | Old frozen GitHub `release/casual-private-beta-2026-10-22`, rollback/reference only | **NOT_TESTED with this gateway**; don't confuse compatible CLI shape with executed behavioral verification |
 
-The hashes above are the documented pins, confirmed against repository status records. **The gateway hashes the actually supplied local file on every invocation**; this document does not claim that the Project Source or frozen binary was read or executed in the current development runtime. Explicit acceptance would require a separate controlled integration run with those exact bytes.
+The default CLI selector keeps its legacy name for existing callers. Its digest tracks the public checkout. The prior public baseline Validator digest `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef` is historical and can be reproduced from commit `ddcd4412c81db80b6c4caceb749220b932793b19`. The prior Card Search digest at that commit is `024de9aaaa1994ab6bce6944bd62e237f9fa9ea0ab52ed5b8bca8aca93a6851e`. **The gateway hashes the actually supplied local file on every invocation**; this document does not claim that the Project Source or frozen binary was read or executed in the current development runtime. Explicit acceptance would require a separate controlled integration run with those exact bytes.
 
 ## MTGJSON Oracle policy
 
@@ -50,7 +50,7 @@ These are **instructions, not proof of executed Project Source tests**. Only use
 4. Real mode rejects alternate Oracle hashes even when the caller supplies them. Synthetic mode does not authenticate real-user ownership.
 5. Input paths, including Validator path, must be regular files without symlink components and within existing size bounds. Filenames and personal collection content are not reflected in generic gateway errors.
 6. After a child returns, the gateway rechecks observed Oracle/collection/deck/selected Validator hashes. A detectable change produces `UNVERIFIED / SOURCE_CHANGED_DURING_EXECUTION` and `tool_execution: FAILED_AFTER_START`; never trust the returned child analysis.
-7. Both `discover` and `validate` execute staged, SHA-checked code bytes in a private temporary directory. Card Search v0.3 has a **non-overridable mandatory code pin**: `024de9aaaa1994ab6bce6944bd62e237f9fa9ea0ab52ed5b8bca8aca93a6851e`. `doctor` checks that pin; `discover` rejects wrong bytes before launching Card Search. The existing Validator profile pin remains mandatory for `validate`.
+7. Both `discover` and `validate` execute staged, SHA-checked code bytes in a private temporary directory. Card Search v0.3 has a **non-overridable mandatory code pin**: `c5ceabbaf98d837e0e72598a15906c085c41eb26da74303a408342ff62d7c4e8`. `doctor` checks that pin; `discover` rejects wrong bytes before launching Card Search. The existing Validator profile pin remains mandatory for `validate`.
 8. Before either child runs, the gateway copies Oracle and collection, plus the deck for validation, to private temporary input snapshots and records the hash of the bytes actually staged. The Oracle snapshot must match the requested SHA and (in real mode) the frozen slim pin. The child reads only these snapshots. The private stage is cleaned after success/failure. Original paths are still rechecked after execution: a detectable change of an original during execution returns `UNVERIFIED / SOURCE_CHANGED_DURING_EXECUTION` even if the child read the trusted snapshots. This is intentional fail-closed behavior.
 9. A set of separately copied inputs is **not** one atomic multi-file capture. The approach does not authenticate collection ownership, protect against hostile same-user manipulation of a temporary runtime, prove complete source-to-file atomicity, or guarantee universal MTG legality. Use a private trusted filesystem. This is development hardening only.
 10. The `--collection-confirmed` flag is an unauthenticated **declaration by the calling agent for this invocation**. The agent may pass it only after the user has explicitly confirmed that specific collection for the current run. Never infer that confirmation from previous chats, manifests or MTGJSON data.
@@ -62,6 +62,6 @@ These are **instructions, not proof of executed Project Source tests**. Only use
 - CI verification must name the *exact head commit*, actual job conclusions and test counts. No user CSV or binary Oracle payload is permitted in GitHub.
 - The existing [JSON Result Contract v1](AGENT_RESULT_CONTRACT_V1.md) now includes `sources.validator_profile` (a selected label, **not authentication**).
 
-**No merge approval** is conveyed by this compatibility profile document. Existing stable Builder, Tester, Validator, Project Sources and old releases stay unchanged.
+**No merge approval** is conveyed by this compatibility profile document. The active public Validator pin applies to this checkout. Project Sources and private release pins are separate.
 
 **Source hardening:** PR #41 adds the independently tested Card Search pin and private input snapshots on top of PR #39.

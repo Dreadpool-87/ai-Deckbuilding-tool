@@ -17,12 +17,12 @@ on:
         description: Confirmed SHA-256 of Deck A source bytes
         required: true
         type: string
-        default: 765ec1e4f4695c0078d12d7d6829ebb7af738e3f05605a6ac087c997c0150f71
+        default: 9237626f44aa05e292642f5b4abff1d4a6836c3156a54b3d092da617c6c4b62d
       sha_b:
         description: Confirmed SHA-256 of Deck B source bytes
         required: true
         type: string
-        default: 8d093e197fcd492b83ed24a41c61767d3f500a0d7083072128a36d6c5212f87e
+        default: 97add7b805d748bdaca17a862cd755a5fc8b6fb1a9f17a11994e67a20e345531
       seed:
         description: Explicit Forge RNG seed
         required: true
@@ -48,9 +48,11 @@ jobs:
       RNG_SEED: ${{ inputs.seed }}
     steps:
       - name: Checkout exact workflow commit
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
       - name: Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "21"
@@ -76,22 +78,13 @@ jobs:
             --sha-a "$SHA_A" --sha-b "$SHA_B"
           cat forge-custom-output/decks/deck-manifest.json
           (cd forge-custom-output/decks && sha256sum *.dck deck-manifest.json) > forge-custom-output/checksums.sha256
-      - name: Restore verified Forge runtime cache
+      - name: Restore Forge release archive cache
         id: forge-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ${{ runner.temp }}/forge-extracted
-          key: forge-runtime-ubuntu-24.04-${{ hashFiles('integrations/forge/forge-version.json') }}-v1
-      - name: Verify restored Forge runtime
-        if: steps.forge-cache.outputs.cache-hit == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          expected=$(jq -er '.sha256' integrations/forge/forge-version.json)
-          test "$(cat "$FORGE_EXTRACTED/.verified-upstream-archive-sha256")" = "$expected"
-          test -n "$(find "$FORGE_EXTRACTED" -type f -name '*.jar' -print -quit)"
-          echo "Verified cached Forge runtime (archive SHA-256: $expected)"
-      - name: Download verified official Forge 2.0.15 archive
+          path: ${{ runner.temp }}/forge-download/forge-installer-2.0.15.tar.bz2
+          key: forge-archive-ubuntu-24.04-${{ hashFiles('integrations/forge/forge-version.json') }}-v1
+      - name: Download official Forge 2.0.15 archive on cache miss
         if: steps.forge-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
@@ -99,19 +92,25 @@ jobs:
           meta=integrations/forge/forge-version.json
           archive=$(jq -er '.archive_name' "$meta")
           url=$(jq -er '.download_url' "$meta")
-          sha=$(jq -er '.sha256' "$meta")
-          size=$(jq -er '.size_bytes' "$meta")
           test "$archive" = "forge-installer-2.0.15.tar.bz2"
           test "$url" = "https://github.com/Card-Forge/forge/releases/download/forge-2.0.15/$archive"
           curl --fail --location --retry 3 --retry-delay 5 \
             --connect-timeout 30 --max-time 1200 \
             --output "$FORGE_DOWNLOAD/$archive" "$url"
-          test "$(stat -c %s "$FORGE_DOWNLOAD/$archive")" = "$size"
-          echo "$sha  $FORGE_DOWNLOAD/$archive" | sha256sum --check
-          tar -tjf "$FORGE_DOWNLOAD/$archive" > /dev/null
-          tar -xjf "$FORGE_DOWNLOAD/$archive" -C "$FORGE_EXTRACTED"
+      - name: Verify archive bytes and extract a fresh Forge runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          meta=integrations/forge/forge-version.json
+          file="$FORGE_DOWNLOAD/forge-installer-2.0.15.tar.bz2"
+          sha=$(jq -er '.sha256' "$meta")
+          size=$(jq -er '.size_bytes' "$meta")
+          test -f "$file"
+          test ! -L "$file"
+          test "$(stat -c %s "$file")" = "$size"
+          printf '%s  %s\n' "$sha" "$file" | sha256sum --check --strict
+          tar -xjf "$file" -C "$FORGE_EXTRACTED"
           test -n "$(find "$FORGE_EXTRACTED" -type f -name '*.jar' -print -quit)"
-          printf "%s\\n" "$sha" > "$FORGE_EXTRACTED/.verified-upstream-archive-sha256"
       - name: Record pinned Forge version metadata
         shell: bash
         run: cp integrations/forge/forge-version.json forge-custom-output/forge-version.json
@@ -143,7 +142,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve evidence, never upload Forge binaries
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: forge-custom-${{ github.run_id }}
           path: forge-custom-output/

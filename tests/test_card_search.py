@@ -1,5 +1,7 @@
 """Offline tests for the independent MTGJSON card discovery tool."""
+import contextlib
 import gzip
+import io
 import importlib.util
 import json
 from pathlib import Path
@@ -114,6 +116,175 @@ class CardSearchTests(unittest.TestCase):
             path.write_text("Name,Quantity\nGrave Viper,-2\n", encoding="utf-8")
             with self.assertRaises(ValueError):
                 TOOL.read_collection(path)
+
+    def test_tribal_subtype_and_oracle_evidence_are_separate(self):
+        self.cards["Fixture Recruiter"] = [card(
+            "Fixture Recruiter", "Other Elves you control get +1/+1.", [],
+            subtypes=["Human"])]
+        self.cards["Fixture Vanilla Elf"] = [card(
+            "Fixture Vanilla Elf", None, [], subtypes=["Elf"])]
+        self.cards["Fixture Kindred Spell"] = [card(
+            "Fixture Kindred Spell", None, [], types=["Kindred", "Instant"],
+            subtypes=["Elf"])]
+        rows = {row["name"]: row for row in TOOL.search(
+            self.cards, theme="Elf tribal")["results"]}
+        self.assertEqual(set(rows), {"Elvish Mystic", "Fixture Vanilla Elf", "Fixture Recruiter"})
+        self.assertEqual(rows["Elvish Mystic"]["theme_match_basis"], ["CREATURE_SUBTYPE"])
+        self.assertEqual(rows["Fixture Recruiter"]["theme_match_basis"], ["ORACLE_TEXT"])
+        self.assertEqual(rows["Fixture Vanilla Elf"]["role_evidence"]["core"]["confidence"],
+                         "HEURISTIC")
+        self.assertEqual(rows["Fixture Vanilla Elf"]["role_evidence"]["core"]["basis"],
+                         "CREATURE_SUBTYPE")
+        self.assertEqual(rows["Fixture Recruiter"]["role_evidence"]["synergy"]["basis"],
+                         "ORACLE_TEXT")
+        self.assertEqual(TOOL.search(self.cards, name="Fynn", theme="Deathtouch")
+                         ["results"][0]["role_evidence"]["payoff"]["basis"], "DIRECT_SYNERGY_CANDIDATE")
+
+    def test_tribal_payoff_does_not_match_substring_in_unrelated_trigger(self):
+        data = {"Fixture Scribe": [card(
+            "Fixture Scribe",
+            "Whenever you target yourself, draw a card.\nCreate an Elf token.",
+            [], subtypes=["Human"])]}
+        result = TOOL.search(data, theme="Elf tribal")["results"][0]
+        self.assertNotIn("payoff", result["roles"])
+        self.assertEqual(result["theme_match_basis"], ["ORACLE_TEXT"])
+
+    def test_face_names_resolve_to_one_card_without_inventing_face_data(self):
+        for layout in ("split", "modal_dfc", "transform", "adventure", "flip", "prepare"):
+            with self.subTest(layout=layout):
+                full = "Fixture Front // Fixture Reverse"
+                variants = [
+                    dict(card(full, "Flying", ["Flying"]), layout=layout,
+                         faceName="Fixture Front", side="a"),
+                    dict(card(full, "Trample", ["Trample"]), layout=layout,
+                         faceName="Fixture Reverse", side="b"),
+                ]
+                owned = TOOL.Counter({"fixture front": 2})
+                result = TOOL.search({full: variants}, name="Fixture Reverse", collection=owned,
+                                     owned_only=True)
+                self.assertEqual([(row["name"], row["owned_copies"]) for row in result["results"]],
+                                 [(full, 2)])
+                self.assertEqual(result["collection_coverage"]["unresolved_name_count"], 0)
+                filtered = TOOL.search({full: variants}, name="Fixture Front", abilities=["Flying"])
+                self.assertEqual(filtered["results"], [])
+                self.assertEqual(filtered["coverage"]["uncertain_variant_matches"], 1)
+
+    def test_ambiguous_faces_and_missing_face_metadata_do_not_establish_ownership(self):
+        first = "Fixture Front // Shared Face"
+        second = "Other Front // Shared Face"
+        incomplete = "Unknown Front // Undeclared Face"
+        data = {
+            first: [dict(card(first, "", []), faceName="Shared Face", layout="split")],
+            second: [dict(card(second, "", []), faceName="Shared Face", layout="transform")],
+            incomplete: [dict(card(incomplete, "", []), layout="split")],
+        }
+        for name in ("shared face", "undeclared face"):
+            with self.subTest(name=name):
+                report = TOOL.search(data, name=name, collection=TOOL.Counter({name: 2}),
+                                     owned_only=True)
+                self.assertEqual(report["results"], [])
+                self.assertEqual(report["name_identity"]["status"], "UNVERIFIED")
+                self.assertEqual(report["collection_coverage"]["identity_status"], "UNVERIFIED")
+                self.assertEqual(report["collection_coverage"]["unverified_owned_names"], [name])
+        self.assertEqual(TOOL.search(data, name="Fixture Front//Shared Face")["results"][0]["name"],
+                         first)
+        data["Shared Face"] = [card("Shared Face", "", [])]
+        self.assertEqual(TOOL.search(data, name="Shared Face")["results"], [])
+
+    def test_contradictory_atomic_names_block_face_and_full_ownership(self):
+        full = "Fixture Front // Fixture Reverse"
+        data = {full: [
+            dict(card(full, "", []), faceName="Fixture Front", layout="transform"),
+            dict(card("Unrelated Card", "", []), faceName="Fixture Reverse", layout="transform"),
+        ]}
+        report = TOOL.search(data, name="Fixture Front", collection=TOOL.Counter({
+            "fixture front": 2, full.casefold(): 1,
+        }), owned_only=True)
+        self.assertEqual(report["results"], [])
+        self.assertEqual(report["name_identity"]["status"], "UNVERIFIED")
+        self.assertEqual(report["collection_coverage"]["unresolved_name_count"], 2)
+
+    def test_contradictory_or_unsupported_face_metadata_blocks_alias_ownership(self):
+        full = "Fixture Front // Fixture Reverse"
+        front = dict(card(full, "", []), faceName="Fixture Front", layout="transform", side="a")
+        back = dict(card(full, "", []), faceName="Fixture Reverse", layout="transform", side="b")
+        for variants in (
+            [front, dict(back, side="a")],
+            [front, dict(back, layout="split")],
+            [front, dict(back, faceName="Unrelated Face")],
+            [dict(front, layout="normal")],
+            [dict(front, side="b")],
+        ):
+            with self.subTest(variants=variants):
+                result = TOOL.search({full: variants}, name="Fixture Front", owned_only=True,
+                                     collection=TOOL.Counter({"fixture front": 1}))
+                self.assertEqual(result["results"], [])
+                self.assertEqual(result["name_identity"]["status"], "UNVERIFIED")
+                self.assertEqual(result["collection_coverage"]["unresolved_name_count"], 1)
+        slim = dict(card(full, "", []), faceName="Fixture Front")
+        report = TOOL.search({full: [slim]}, name="Fixture Front", owned_only=True,
+                             collection=TOOL.Counter({"fixture front": 1}))
+        self.assertEqual(report["results"][0]["name"], full)
+
+    def test_contradictory_record_name_contends_with_other_canonical_key(self):
+        data = {
+            "Fixture Alpha": [card("Fixture Alpha", "", [])],
+            "Fixture Beta": [card("Fixture Alpha", "", [])],
+        }
+        report = TOOL.search(data, name="Fixture Alpha", owned_only=True,
+                             collection=TOOL.Counter({"fixture alpha": 1}))
+        self.assertEqual(report["results"], [])
+        self.assertEqual(report["name_identity"]["candidate_names"], ["Fixture Alpha", "Fixture Beta"])
+        self.assertEqual(report["collection_coverage"]["unresolved_name_count"], 1)
+
+    def test_csv_diagnostics_fail_closed_and_include_physical_line(self):
+        cases = {
+            "Name,Quantity\n,\n": "line 2.*Name",
+            "Name,Quantity\nFixture,-2\n": "line 2.*Quantity",
+            "Name,Quantity\nFixture\n": "line 2.*fields",
+            "Name,Quantity\nFixture,1,unexpected\n": "line 2.*fields",
+            'Name,Quantity\n"unclosed,1\n': "line 2.*unexpected end",
+            'Name,Quantity\n"Two\nLine",1\nBad,no\n': "line 4.*Quantity",
+            "Name,Quantity,Quantity\nFixture,1,2\n": "line 1.*duplicate",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "owned.csv"
+            for contents, pattern in cases.items():
+                with self.subTest(contents=contents):
+                    path.write_text(contents, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, pattern):
+                        TOOL.read_collection(path)
+
+    def test_invalid_oracle_color_shape_does_not_claim_identity(self):
+        malformed = card("Broken Color", "", [], identity=[["B"]])
+        result = TOOL.search({"Broken Color": [malformed]}, name="Broken")
+        self.assertIsNone(result["results"][0]["color_identity"])
+
+    def test_malformed_collection_cli_does_not_write_results(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            oracle, collection, output = [Path(tmp) / name
+                                          for name in ("oracle.json", "owned.csv", "result.json")]
+            oracle.write_text(json.dumps({"data": self.cards}), encoding="utf-8")
+            collection.write_text("Name,Quantity\nGrave Viper,1\n,\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as stderr:
+                result = TOOL.main(["--oracle", str(oracle), "--collection", str(collection),
+                                    "--owned-only", "--name", "Viper", "--output", str(output)])
+            self.assertEqual(result, 2)
+            self.assertIn("line 3: Name is empty", stderr.getvalue())
+            self.assertFalse(output.exists())
+
+    def test_atomic_rejects_duplicate_canonical_keys_and_metadata_fields(self):
+        cases = (
+            ('{"data":{"Fixture":[],"Fixture":[]}}', "Fixture"),
+            ('{"data":{"Fixture":[{"faceName":"First","faceName":"Second"}]}}', "faceName"),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "AtomicCards.json"
+            for contents, key in cases:
+                with self.subTest(key=key):
+                    path.write_text(contents, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "Duplicate Oracle JSON key.*" + key):
+                        TOOL.read_atomic(path)
 
     def test_atomic_gzip_load(self):
         with tempfile.TemporaryDirectory() as tmp:

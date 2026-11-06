@@ -34,7 +34,9 @@ STANDARD_BASICS = frozenset({
 TYPES = ('Land', 'Creature', 'Instant', 'Sorcery', 'Planeswalker', 'Artifact',
          'Enchantment', 'Battle', 'Kindred')
 PRIMARY_TYPES = TYPES + ('Other',)
-ENTRY = re.compile(r'^\s*(\d+)\s*(?:[x×]\s*)?(.+?)\s*$', re.I)
+# An ASCII x marker must attach to the quantity and be followed by whitespace.
+# Keep the grammar identical in the standalone Validator and Spellbook analyzer.
+ENTRY = re.compile(r'^([0-9]+)(?:[xX]\s+|×\s*|\s+)(\S.*)$')
 HEADER = re.compile(r'^\s*(?:Deck|Mainboard|Main Deck|Commander|Companion|'
                     r'Creatures?|Instants?|Sorceries?|Lands?|Planeswalkers?|'
                     r'Artifacts?|Enchantments?|Battles|Other Spells|Spells)'
@@ -46,20 +48,35 @@ def read_collection(path):
     """Read exactly ONE active inventory. Duplicate names sum; no merging with other files."""
     owned = Counter()
     with open(path, encoding='utf-8-sig', newline='') as handle:
-        reader = csv.DictReader(handle)
-        if not reader.fieldnames or not {'Name', 'Quantity'} <= set(reader.fieldnames):
-            raise ValueError('Collection CSV needs columns Name and Quantity')
-        for line, row in enumerate(reader, 2):
-            name = (row.get('Name') or '').strip()
-            value = (row.get('Quantity') or '').strip()
-            if not name and not value:
-                continue
-            if not name:
-                raise ValueError('Collection CSV line %d: missing Name' % line)
-            if not re.fullmatch(r'\d+', value):
-                raise ValueError('Collection CSV line %d (%s): invalid Quantity %r' %
-                                 (line, name, value))
-            owned[name] += int(value)
+        reader = csv.reader(handle, strict=True)
+        line = 1
+        try:
+            header = next(reader, [])
+            if (len(set(header)) != len(header)
+                    or not {'Name', 'Quantity'} <= set(header)):
+                raise ValueError('Collection CSV line 1: needs unique Name and Quantity columns')
+            name_index, quantity_index = header.index('Name'), header.index('Quantity')
+            while True:
+                line = reader.line_num + 1
+                row = next(reader, None)
+                if row is None:
+                    break
+                if not row:
+                    continue
+                if len(row) != len(header):
+                    raise ValueError('Collection CSV line %d: wrong number of fields' % line)
+                name, value = row[name_index].strip(), row[quantity_index].strip()
+                if not name:
+                    raise ValueError('Collection CSV line %d: missing Name' % line)
+                if not re.fullmatch(r'\d+', value):
+                    raise ValueError('Collection CSV line %d: invalid Quantity' % line)
+                try:
+                    owned[name] += int(value)
+                except ValueError:
+                    raise ValueError('Collection CSV line %d: Quantity is too large' % line) from None
+        except csv.Error as exc:
+            raise ValueError('Collection CSV line %d: %s' % (line, exc)) from None
+
     return owned
 
 
@@ -76,7 +93,7 @@ def read_oracle(path):
 
 
 def parse_deck(path):
-    """Only accepts explicit '4 Name' lines and harmless section labels.
+    """Accept explicit quantity/name lines and harmless section labels.
 
     Sideboard sections are rejected, rather than secretly counted in the main deck.
     """
@@ -104,7 +121,7 @@ def parse_deck(path):
                 problems.append('Line %d: cannot parse %r' % (line_no, text))
                 continue
             quantity, name = int(match.group(1)), match.group(2).strip()
-            if quantity <= 0 or not name:
+            if quantity <= 0:
                 problems.append('Line %d: invalid quantity or name' % line_no)
             else:
                 cards[name] += quantity

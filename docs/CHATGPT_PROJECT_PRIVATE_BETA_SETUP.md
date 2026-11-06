@@ -10,7 +10,7 @@
 **Keep unchanged, if they already exist and are readable:**
 - `MTG_Deck_Builder_v7.4_full.md`, local Project source SHA-256: `ab37cb2f3c67a5d5c078bdb1ab7c13b7e955c14f17484bf385bac70c7bb424a5` (GitHub equivalent differs only by newline normalization; no need to re-upload).
 - `MTG_Deck_Tester_v3.4.2_full.md`, local SHA-256: `40871a2a6e143625a177f6730e1dd68a8572b5bc62a129e41db8ab4f158d8a30`.
-- `MTG_Deck_Validator_v1.1.1_PREPARE_COLOR_INTEGRITY_CANDIDATE.py`, **currently selected ChatGPT Project v1.6 Validator**, SHA-256 `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d`. Project activation: `ACTIVATION_CONFIRMED` on 2026-10-31. GitHub `main` Private Beta v0.2 contains the same functional source with one corrected docstring usage example under `validator/MTG_Deck_Validator_v1.1.1.py`, SHA-256 `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef`. **Do not claim the Project source has been updated**: source selection and project instructions must be deliberately migrated and verified before saying both environments are byte-identical. The frozen beta branch retains the older implementation.
+- `MTG_Deck_Validator_v1.1.1_PREPARE_COLOR_INTEGRITY_CANDIDATE.py`, **currently selected ChatGPT Project v1.6 Validator**, SHA-256 `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d`. Project activation: `ACTIVATION_CONFIRMED` on 2026-10-31. Historical private GitHub `main` at Beta v0.2 contained the same functional source with one corrected docstring usage example under `validator/MTG_Deck_Validator_v1.1.1.py`, SHA-256 `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef`. **Do not claim the Project source has been updated**: source selection and project instructions must be deliberately migrated and verified before saying both environments are byte-identical. The frozen beta branch retains the older implementation.
 - `MTG_Deck_Validator_v1.1.1_BETA_CANDIDATE.py`, **previous active beta — rollback ONLY**, SHA-256: `8749b50d0aeaa52124a99271a0ab40bcc979350c6e8b5e9074c4f28d63a3d1ac`. This is byte-identical to GitHub's `validator/MTG_Deck_Validator_v1.1.1.py` in the frozen beta baseline.
 - `MTG_Deck_Validator_v1.1.1.py`, **historical Project rollback**, local SHA-256: `0d296f69a465bdaf5d967d2155460bbe69bb3d653f58952468d45713d2f9db8e`. Keep this file; do **not** accidentally select it for beta checks.
 - Applicable supporting files `AtomicCards_slim_v2.json.gz`, `card_search.py`, `synergy_engine.py`, `combo_synergy_report.py`, `MTG_Deckbuilding_Rules_Casual_v1.0.txt`, `CARD_SEARCH.md` if used by the workflow. Confirm actual readability and execution before claiming use.
@@ -21,7 +21,7 @@ The **old** `PROJECT_SETUP_ADDENDUM.md` described *pre-acceptance beta-candidate
 
 ## 2. Active Project Instructions v1.6 (do not append the old override)
 
-The user's Casual ChatGPT **Project Instructions v1.6** still select the 2026-10-31 Prepare Validator. It remains valid for its proven scope but is **not automatically the GitHub Private Beta v0.2 source**; GitHub's SHA differs only due to a corrected CLI usage docstring. **Do not paste the obsolete 2026-10-22 `ACTIVE PROJECT OVERRIDE` block** or append a second competing selection: ChatGPT Project instructions have an 8,000-character limit. The excerpt below is for confirming the existing selection **inside** v1.6, not for replacing the complete Project Instructions.
+The user's Casual ChatGPT **Project Instructions v1.6** still select the 2026-10-31 Prepare Validator. It remains valid for its proven scope but is **not automatically the GitHub Private Beta v0.2 source**; The historical private v0.2 SHA differed only because of a corrected CLI usage docstring. The audited public preview has separate behavior and pins. **Do not paste the obsolete 2026-10-22 `ACTIVE PROJECT OVERRIDE` block** or append a second competing selection: ChatGPT Project instructions have an 8,000-character limit. The excerpt below is for confirming the existing selection **inside** v1.6, not for replacing the complete Project Instructions.
 
 ~~~text
 Builder: MTG_Deck_Builder_v7.4_full.md
@@ -54,3 +54,8 @@ SHA-256: 0d296f69a465bdaf5d967d2155460bbe69bb3d653f58952468d45713d2f9db8e
 ## 4. Development handoff
 
 For current development priorities, see AI Deckbuilding Roadmap v0.1 (historical private reference): P1 AI Swap Advisor, P2 Mana Bottleneck Detector, P3 Cross-mechanic Synergy Discovery, P4 Strategic Robustness, P5 deferred AIO. The beta is the baseline; implementation is experimental until separately approved and tested.
+
+
+## Public preview synchronization
+
+The public audit remediation does not migrate Project Instructions v1.6. To adopt the public changes separately, keep the existing rollback files, verify the new Validator and any supporting tool bytes against the [public source pins](AGENT_SOURCE_COMPATIBILITY_P4.md), deliberately select the new sources in the Project instructions, and rerun positive and negative synthetic validation inside the actual Project runtime. Recheck any tooling that selects profiles by digest. A passing GitHub or local run is evidence for that environment only.
