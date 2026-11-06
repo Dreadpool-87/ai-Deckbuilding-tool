@@ -11,7 +11,7 @@ construction occurs. The existing v0.1 public search API and CLI remain usable.
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 import csv
 import gzip
 import json
@@ -30,6 +30,7 @@ COLOR_ORDER = "WUBRG"
 MAX_LIMIT = 500
 ROLE_ORDER = ("core", "enabler", "payoff", "synergy", "interaction")
 ROLE_SET = frozenset(ROLE_ORDER)
+FACE_ALIAS_LAYOUTS = frozenset({"adventure", "flip", "modal_dfc", "prepare", "split", "transform"})
 
 # Heuristics are intentionally *small and explicit*; they are not MTG rules.
 # A new mechanic need not be registered to work as an exact Oracle-text theme.
@@ -39,19 +40,23 @@ ALIASES = {
     "tokens": "token",
     "+1/+1 counters": "+1/+1 counter",
     "counters": "+1/+1 counter",
-    "elf tribal": "elf",
-    "zombie tribal": "zombie",
 }
-PAYOFF_WORDING = re.compile(
-    r"(?i)\b(?:whenever|when|if|for each|as long as|each time)\b"
-)
+
+
+def reject_duplicate_oracle_keys(pairs: list[tuple[str, Any]]) -> dict:
+    record = {}
+    for key, value in pairs:
+        if key in record:
+            raise ValueError(f"Duplicate Oracle JSON key: {key!r}")
+        record[key] = value
+    return record
 
 
 def read_atomic(path: Path) -> tuple[dict, dict]:
     """Load MTGJSON AtomicCards.json(.gz), not AllPrintings or an arbitrary JSON."""
     opener = gzip.open if str(path).lower().endswith(".gz") else open
     with opener(path, "rt", encoding="utf-8") as handle:
-        raw = json.load(handle)
+        raw = json.load(handle, object_pairs_hook=reject_duplicate_oracle_keys)
     if not isinstance(raw, dict):
         raise ValueError("MTGJSON root must be a JSON object")
     cards = raw.get("data", raw)
@@ -65,17 +70,39 @@ def read_collection(path: Path) -> Counter:
     """Parse a user-supplied Name,Quantity CSV, never assume a saved inventory."""
     owned: Counter = Counter()
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        if not reader.fieldnames or not {"Name", "Quantity"} <= set(reader.fieldnames):
-            raise ValueError("Collection CSV requires exact columns Name and Quantity")
-        for number, row in enumerate(reader, 2):
-            name = (row.get("Name") or "").strip()
-            count = (row.get("Quantity") or "").strip()
-            if not name and not count:
-                continue
-            if not name or not re.fullmatch(r"[0-9]+", count):
-                raise ValueError(f"Invalid collection entry at line {number}")
-            owned[name.casefold()] += int(count)
+        reader = csv.reader(handle, strict=True)
+        line = 1
+        try:
+            headers = next(reader, [])
+            if len(headers) != len(set(headers)):
+                raise ValueError("Invalid collection CSV at line 1: duplicate column names")
+            if not {"Name", "Quantity"} <= set(headers):
+                raise ValueError("Collection CSV at line 1 requires exact columns Name and Quantity")
+            name_index, count_index = headers.index("Name"), headers.index("Quantity")
+            while True:
+                line = reader.line_num + 1
+                row = next(reader, None)
+                if row is None:
+                    break
+                if not row:
+                    continue
+                if len(row) != len(headers):
+                    raise ValueError(f"Invalid collection entry at line {line}: expected "
+                                     f"{len(headers)} fields, found {len(row)}")
+                name, count = row[name_index].strip(), row[count_index].strip()
+                if not name:
+                    raise ValueError(f"Invalid collection entry at line {line}: Name is empty")
+                if not re.fullmatch(r"[0-9]+", count):
+                    raise ValueError(f"Invalid collection entry at line {line}: "
+                                     "Quantity must be a nonnegative integer")
+                try:
+                    quantity = int(count)
+                except ValueError as exc:
+                    raise ValueError(f"Invalid collection entry at line {line}: "
+                                     "Quantity exceeds the supported integer size") from exc
+                owned[name.casefold()] += quantity
+        except csv.Error as exc:
+            raise ValueError(f"Invalid collection CSV at line {line}: {exc}") from exc
     return owned
 
 
@@ -119,20 +146,39 @@ def matching_line(text: str, pattern: str, flags: int = re.IGNORECASE) -> str | 
 
 
 def _add(found: dict, role: str, *, reason: str, evidence: str,
-         confidence: str = "HIGH", conditional: bool = False) -> None:
+         confidence: str = "HIGH", conditional: bool = False,
+         basis: str = "HEURISTIC_STRATEGY") -> None:
     """One evidence item per role; multiple roles per card are allowed."""
     if role not in found:
         found[role] = {
             "role": role, "reason": reason, "evidence": evidence[:450],
-            "confidence": confidence, "conditional": conditional,
+            "confidence": confidence, "conditional": conditional, "basis": basis,
         }
 
 
-def _keyword_core(card: dict, topic: str, original: str) -> bool:
+def _keyword_core(topic: str, original: str) -> bool:
     if printed_ability_line(original, topic):
         return True
     # Named ability-word lines (e.g. Landfall — ...) are not always keywords.
     return bool(re.search(r"(?im)^" + re.escape(topic) + r"\s*[—–-]\s*", original))
+
+
+def creature_subtype_match(card: dict, subtype: str) -> bool:
+    return (isinstance(card.get("types"), list) and "Creature" in card["types"]
+            and isinstance(card.get("subtypes"), list)
+            and any(isinstance(value, str) and value.casefold() == subtype
+                    for value in card["subtypes"]))
+
+
+def theme_patterns(theme: str) -> tuple[str, str | None, str]:
+    normalized = theme.strip().casefold()
+    subtype = normalized.removesuffix(" tribal").strip() if normalized.endswith(" tribal") else None
+    topic = subtype if subtype is not None else ALIASES.get(normalized, normalized)
+    term = re.escape(topic)
+    if subtype:
+        plural = {"elf": "elves", "dwarf": "dwarves", "faerie": "faeries"}.get(subtype)
+        term = rf"(?:{term}|{plural})" if plural else rf"{term}(?:es|s)?"
+    return topic, subtype, rf"(?<!\w){term}(?!\w)"
 
 
 def classify_variant(card: dict, theme: str) -> dict:
@@ -140,58 +186,64 @@ def classify_variant(card: dict, theme: str) -> dict:
 
     This is a thematic discovery heuristic, NOT an executable Oracle parser.
     """
-    if not isinstance(card, dict) or not isinstance(card.get("text"), str):
+    if not isinstance(card, dict):
         return {}
-    topic = ALIASES.get(theme.strip().casefold(), theme.strip().casefold())
+    topic, tribal_subtype, topic_pattern = theme_patterns(theme)
     if not topic:
         return {}
     if topic == "lifegain":
         return classify_lifegain_variant(card)
-    original = card["text"]
+    original = card.get("text")
+    original = original if isinstance(original, str) else ""
     text = remove_reminder_text(original)
-    low = text.casefold()
-    lowered_topic = topic.casefold()
     found = {}
     escaped = re.escape(topic)
-    has_topic = bool(re.search(r"(?i)(?<![\w])" + escaped + r"(?![\w])", text))
+    has_topic = bool(re.search(topic_pattern, text, re.IGNORECASE))
+    if tribal_subtype and creature_subtype_match(card, tribal_subtype):
+        _add(found, "core", reason="MTGJSON creature subtype matches the requested theme",
+             evidence=next(value for value in card["subtypes"]
+                           if isinstance(value, str) and value.casefold() == tribal_subtype),
+             confidence="HEURISTIC", basis="CREATURE_SUBTYPE")
     keyword_values = card.get("keywords")
     has_metadata = (isinstance(keyword_values, list) and
                     topic in {k.casefold() for k in keyword_values if isinstance(k, str)})
 
-    if _keyword_core(card, topic, original):
+    if _keyword_core(topic, original):
         _add(found, "core", reason="Printed standalone ability / named mechanic",
-             evidence=matching_line(original, r"(?im)^\s*" + escaped) or original[:300])
+             evidence=matching_line(original, r"(?im)^\s*" + escaped) or original[:300],
+             basis="ORACLE_TEXT")
     elif has_metadata and re.search(r"(?im)^\s*" + escaped + r"\b", original):
         _add(found, "core", reason="Printed mechanic corroborated by keyword metadata",
-             evidence=matching_line(original, r"(?im)^\s*" + escaped) or original[:300])
+             evidence=matching_line(original, r"(?im)^\s*" + escaped) or original[:300],
+             basis="ORACLE_TEXT")
 
     # A self-activation creates a conditional core ability, not an unconditional one.
     if not "core" in found and has_topic and re.search(
-        r"(?i)(?:this creature|this permanent|it) gains?\s+" + escaped, text
+        r"(?i)(?:this creature|this permanent|it) gains?\s+" + topic_pattern, text
     ):
         _add(found, "core", reason="Can gain its own ability conditionally",
-             evidence=matching_line(text, r"(?i)(?:this creature|this permanent|it) gains?\s+" + escaped) or text[:300],
-             confidence="HEURISTIC", conditional=True)
+             evidence=matching_line(text, r"(?i)(?:this creature|this permanent|it) gains?\s+" + topic_pattern) or text[:300],
+             confidence="HEURISTIC", conditional=True, basis="ORACLE_TEXT")
 
     # Keyword grant or access for other permanents/creatures.
     if has_topic:
-        grants = r"(?i)(?:gain|gains|have|has|grant|grants)\s+(?:(?:\w+\s+){0,4})?" + escaped
+        grants = r"(?i)(?:gain|gains|have|has|grant|grants)\s+(?:(?:\w+\s+){0,4})?" + topic_pattern
         grant_line = matching_line(text, grants)
-        if grant_line and not re.search(r"(?i)(?:this creature|this permanent|it)\s+gains?\s+" + escaped, grant_line):
+        if grant_line and not re.search(r"(?i)(?:this creature|this permanent|it)\s+gains?\s+" + topic_pattern, grant_line):
             _add(found, "enabler", reason="Provides or grants the requested mechanic",
-                 evidence=grant_line, confidence="HEURISTIC", conditional=True)
+                 evidence=grant_line, confidence="HEURISTIC", conditional=True, basis="DIRECT_SYNERGY_CANDIDATE")
         # Require the theme IN THE SAME condition/trigger sentence. A card
         # with Deathtouch and an unrelated death trigger is not a theme payoff.
-        trigger = r"(?i)\b(?:whenever|when|if|for each|as long as)\b[^\n.!?]{0,180}" + escaped
+        trigger = r"(?i)\b(?:whenever|when|if|for each|as long as)\b[^\n.!?]{0,180}" + topic_pattern
         line = matching_line(text, trigger)
         if line:
             _add(found, "payoff", reason="Trigger or condition specifically references the requested theme",
-                 evidence=line, confidence="HEURISTIC", conditional=True)
+                 evidence=line, confidence="HEURISTIC", conditional=True, basis="DIRECT_SYNERGY_CANDIDATE")
 
-        # Non-keyword strategic card: mentions mechanic in an ability sentence.
         if not found:
             _add(found, "synergy", reason="Mentions requested theme; relationship needs Oracle review",
-                 evidence=matching_line(text, escaped) or text[:300], confidence="HEURISTIC", conditional=True)
+                 evidence=matching_line(text, topic_pattern) or text[:300],
+                 confidence="HEURISTIC", conditional=True, basis="ORACLE_TEXT")
 
     if topic == "deathtouch":
         # Damage to a creature counts as synergy only when card's own creature
@@ -204,12 +256,12 @@ def classify_variant(card: dict, theme: str) -> dict:
             line = matching_line(text, r"(?i)(?:that creature|it) deals? damage equal to its power to target creature")
         if line:
             _add(found, "synergy", reason="Own creature deals damage to another creature; Deathtouch may matter",
-                 evidence=line, confidence="HEURISTIC", conditional=True)
+                 evidence=line, confidence="HEURISTIC", conditional=True, basis="DIRECT_SYNERGY_CANDIDATE")
         # Actual 'fight' action also makes deathtouch relevant to dealt damage.
         line = matching_line(text, r"(?i)(?:target creature you control|creature you control).*?fights?\s+(?:target|another|a) creature")
         if line:
             _add(found, "synergy", reason="Fight effect can combine with Deathtouch",
-                 evidence=line, confidence="HEURISTIC", conditional=True)
+                 evidence=line, confidence="HEURISTIC", conditional=True, basis="DIRECT_SYNERGY_CANDIDATE")
     elif topic == "lifelink":
         line = matching_line(text, r"(?i)(?:whenever|if)\s+(?:you|a player)\s+gain(?:s)?\s+life")
         if line:
@@ -237,12 +289,6 @@ def classify_variant(card: dict, theme: str) -> dict:
             _add(found, "payoff", reason="Indirect condition may benefit from the requested strategy",
                  evidence=line, confidence="HEURISTIC", conditional=True)
 
-    # Generic fallback when a mechanic has no registered interaction profile.
-    # This discovers cards explicitly mentioning it, but does NOT fabricate
-    # unseen indirect synergies or declare role coverage complete.
-    if has_topic and not found:
-        _add(found, "synergy", reason="Oracle-text theme mention; strategic role unverified",
-             evidence=matching_line(text, escaped) or text[:300], confidence="HEURISTIC", conditional=True)
     return found
 
 
@@ -434,6 +480,90 @@ def build_lifegain_synergy_pairs(matches: list[dict], max_pairs: int) -> dict:
     }
 
 
+def identity_key(name: str) -> str:
+    return "//".join(part.strip().casefold() for part in name.split("//"))
+
+
+def card_name_index(cards: dict) -> tuple[dict, dict]:
+    """Index exact canonical names and corroborated face names separately from claims."""
+    verified = defaultdict(set)
+    possible = defaultdict(set)
+    for canonical, variants in cards.items():
+        if not isinstance(canonical, str):
+            continue
+        full = identity_key(canonical)
+        possible[full].add(canonical)
+        faces = full.split("//") if "//" in full else []
+        for face in filter(None, faces):
+            possible[face].add(canonical)
+        if not isinstance(variants, list) or not variants:
+            continue
+        names_agree = True
+        aliases_agree = len(faces) == 2 and all(faces) and faces[0] != faces[1]
+        expected_sides = dict(zip(faces, ("a", "b")))
+        layouts = set()
+        corroborated_faces = set()
+        for variant in variants:
+            if not isinstance(variant, dict):
+                names_agree = False
+                continue
+            record_name = variant.get("name")
+            record_key = identity_key(record_name) if isinstance(record_name, str) else None
+            if record_key:
+                possible[record_key].add(canonical)
+            if record_name is not None and record_key != full:
+                names_agree = False
+
+            layout = variant.get("layout")
+            if isinstance(layout, str) and layout in FACE_ALIAS_LAYOUTS:
+                layouts.add(layout)
+            elif layout is not None:
+                aliases_agree = False
+
+            side = variant.get("side")
+            if side not in (None, "a", "b"):
+                aliases_agree = False
+            face_name = variant.get("faceName")
+            if face_name is None:
+                continue
+            if not isinstance(face_name, str) or not face_name.strip():
+                aliases_agree = False
+                continue
+            face = identity_key(face_name)
+            possible[face].add(canonical)
+            if face not in expected_sides or side not in (None, expected_sides[face]):
+                aliases_agree = False
+            elif record_key == full:
+                corroborated_faces.add(face)
+        if names_agree:
+            verified[full].add(canonical)
+            if aliases_agree and len(layouts) <= 1:
+                for face in corroborated_faces:
+                    verified[face].add(canonical)
+    return verified, possible
+
+
+def resolve_collection(collection: Counter, verified: dict, possible: dict) -> tuple[Counter, dict]:
+    owned = Counter()
+    absent, unverified = [], []
+    for name, quantity in collection.items():
+        key = identity_key(name)
+        claims = possible.get(key, set())
+        if not claims:
+            absent.append(name)
+        elif len(claims) != 1 or claims != verified.get(key):
+            unverified.append(name)
+        else:
+            owned[next(iter(claims))] += quantity
+    return owned, {
+        "distinct_nonzero_owned_names": sum(quantity > 0 for quantity in collection.values()),
+        "owned_names_absent_from_oracle": sorted(absent),
+        "unverified_owned_names": sorted(unverified),
+        "unresolved_name_count": len(absent) + len(unverified),
+        "identity_status": "UNVERIFIED" if absent or unverified else "MATCHED",
+    }
+
+
 def evaluate_variant(card: dict, *, name: str | None, abilities: list[str],
                      keywords: list[str], oracle_text: list[str],
                      card_type: str | None, subtype: str | None,
@@ -531,6 +661,24 @@ def search(cards: dict, *, name: str | None = None,
         raise ValueError("max_synergy_pairs must be between 1 and 500")
     identity = (None if color_identity is not None and color_identity.strip().upper() == "ANY"
                 else color_set(color_identity) if color_identity is not None else None)
+    owned, collection_coverage = None, None
+    name_targets, name_identity = None, None
+    if collection is not None or name is not None:
+        verified, possible = card_name_index(cards)
+        if collection is not None:
+            owned, collection_coverage = resolve_collection(collection, verified, possible)
+        if name is not None:
+            key = identity_key(name)
+            claims = possible.get(key)
+            if claims and (len(claims) != 1 or claims != verified.get(key)):
+                name_targets = set()
+                name_identity = {"status": "UNVERIFIED", "candidate_names": sorted(claims)}
+            elif claims and any("//" in canonical for canonical in claims):
+                name_targets = claims
+                name_identity = {"status": "MATCHED", "candidate_names": sorted(claims)}
+
+    if theme is not None:
+        _, tribal_subtype, topic_pattern = theme_patterns(theme)
     totals = Counter()
     matches = []
     role_totals = Counter()
@@ -545,11 +693,13 @@ def search(cards: dict, *, name: str | None = None,
             isinstance(v.get("supertypes"), list) and "Basic" in v["supertypes"]
             for v in variants
         )
-        count = collection.get(canonical_name.casefold(), 0) if collection is not None else None
+        if name_targets is not None and canonical_name not in name_targets:
+            continue
+        count = owned.get(canonical_name, 0) if owned is not None else None
         if owned_only and not (is_basic or count > 0):
             continue
         outcomes = [evaluate_variant(
-            v, name=name, abilities=abilities, keywords=keywords,
+            v, name=name if name_targets is None else None, abilities=abilities, keywords=keywords,
             oracle_text=oracle_text, card_type=card_type, subtype=subtype,
             identity=identity, min_mv=min_mv, max_mv=max_mv,
         ) for v in variants]
@@ -560,10 +710,21 @@ def search(cards: dict, *, name: str | None = None,
             continue
 
         role_info = {}
+        match_basis = []
         if theme is not None:
+            if tribal_subtype and all(creature_subtype_match(v, tribal_subtype) for v in variants):
+                match_basis.append("CREATURE_SUBTYPE")
+            if all(isinstance(v.get("text"), str)
+                   and re.search(topic_pattern, remove_reminder_text(v["text"]), re.IGNORECASE) for v in variants):
+                match_basis.append("ORACLE_TEXT")
             observed = [classify_variant(v, theme) for v in variants]
             agreed_roles = set.intersection(*(set(d.keys()) for d in observed))
             union_roles = set.union(*(set(d.keys()) for d in observed))
+            if tribal_subtype:
+                agreed_roles = {
+                    role for role in agreed_roles
+                    if len({record[role]["basis"] for record in observed}) == 1
+                }
             if union_roles != agreed_roles:
                 totals["uncertain_role_variants"] += 1
             if not agreed_roles and not ("interaction" in roles):
@@ -581,10 +742,14 @@ def search(cards: dict, *, name: str | None = None,
         mvs = {v.get("manaValue") for v in variants
                if type(v.get("manaValue")) in (float, int)}
         mv = next(iter(mvs)) if len(mvs) == 1 else None
-        identities = {tuple(v.get("colorIdentity")) for v in variants
-                      if isinstance(v.get("colorIdentity"), list)}
+        identities = {
+            frozenset(v["colorIdentity"]) if isinstance(v.get("colorIdentity"), list)
+            and all(isinstance(color, str) and color in set(COLOR_ORDER)
+                    for color in v["colorIdentity"]) else None
+            for v in variants
+        }
         display_identity = ("".join(ch for ch in COLOR_ORDER if ch in next(iter(identities)))
-                            if len(identities) == 1 else None)
+                            if len(identities) == 1 and None not in identities else None)
         rules = card.get("text")
         for role in role_info:
             role_totals[role] += 1
@@ -601,6 +766,7 @@ def search(cards: dict, *, name: str | None = None,
             "printing_variants": len(variants),
             "roles": list(role_info),
             "role_evidence": role_info,
+            "theme_match_basis": match_basis,
             "match_status": "FILTER_MATCH_NOT_DECK_VALIDATION",
         })
     matches.sort(key=lambda item: (
@@ -636,6 +802,10 @@ def search(cards: dict, *, name: str | None = None,
             "No banlist, full MTG rules, deck size, copy limits, mana consistency or gameplay validation was run.",
         ],
     }
+    if name_identity is not None:
+        report["name_identity"] = name_identity
+    if collection_coverage is not None:
+        report["collection_coverage"] = collection_coverage
     if synergy:
         report["synergy_analysis"] = build_lifegain_synergy_pairs(matches, max_synergy_pairs)
     return report
@@ -661,7 +831,11 @@ def human_report(report: dict) -> str:
         if report["query"].get("theme"):
             for role, note in card["role_evidence"].items():
                 lines.append(f"    {role}: {note['evidence']} "
-                             f"[{note['confidence']}{', CONDITIONAL' if note['conditional'] else ''}]")
+                             f"[{note['basis']}, {note['confidence']}{', CONDITIONAL' if note['conditional'] else ''}]")
+    if report.get("name_identity", {}).get("status") == "UNVERIFIED":
+        lines.append("NOTE: the exact name has UNVERIFIED Oracle identity.")
+    if report.get("collection_coverage", {}).get("identity_status") == "UNVERIFIED":
+        lines.append("NOTE: some collection names have UNVERIFIED Oracle identity and supplied no copies.")
     if report["coverage"].get("uncertain_variant_matches", 0):
         lines.append("NOTE: some cards were excluded due to missing/conflicting Oracle fields.")
     if report["coverage"].get("uncertain_role_variants", 0):
@@ -720,16 +894,6 @@ def main(argv: list[str] | None = None) -> int:
         report["oracle_version"] = meta.get("version")
         report["oracle_file"] = str(args.oracle)
         report["collection_provided"] = args.collection is not None
-        # An explicit figure for collection lookup is more honest than a claim
-        # that the *entire* MTGJSON database was indexed from a slim snapshot.
-        if owned is not None:
-            known = {name.casefold() for name in data}
-            unresolved = sorted(name for name in owned if name not in known)
-            report["collection_coverage"] = {
-                "distinct_nonzero_owned_names": sum(n > 0 for n in owned.values()),
-                "owned_names_absent_from_oracle": unresolved,
-                "unresolved_name_count": len(unresolved),
-            }
         rendered = (json.dumps(report, ensure_ascii=False, indent=2) + "\n"
                     if args.format == "json" else human_report(report))
         if args.output:

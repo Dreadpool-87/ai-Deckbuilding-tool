@@ -98,3 +98,8 @@ python -m unittest discover -s tests -p 'test_*.py' -v
 Synthetic tests cover Commander backward compatibility; casual length and commander exclusion; case-insensitive quantity matching; separated salt score provenance; user card-salt CSV parsing; privacy and the CLI. **Real official bulk export verified on 2026-10-15.** An explicitly invoked, one-off GitHub Actions smoke test fetched the official compressed snapshot (29,326,432 bytes, SHA-256 `d8424ddcc1f41e09883844656c0ff8847cc9781216910468dc4ba42a5d6d2043`, exporter version 7.1.11, timestamp 2026-10-15T13:11:32Z). The export contained **114,756 variants**, with **1,236** requiring a commander and **108** exposing a numeric combo salt value. The real-data test confirmed that a **60-card synthetic deck with Sanguine Bond and Exquisite Blood** yields the corresponding two-card ingredient candidate. Results establish **data schema and ingredient-matching compatibility only**, not mana/timing/rules correctness, complete coverage, or a verified deck strength assessment.
 
 The temporary automated bulk-download step was removed after the successful check; normal GitHub CI runs **only offline synthetic tests**. The reusable `tests/live_bulk_smoke.py` may be invoked manually when the official schema changes. No official export or personal collection is committed, published, or bundled.
+
+
+## Deck entry separators
+
+Use `4 Lightning Bolt`, `4x Lightning Bolt`, `4× Lightning Bolt`, or `4×Lightning Bolt`. An attached ASCII `x` or `X` requires a following space. After whitespace immediately following the quantity, the text is a card name. This preserves names such as `Xenagos, God of Revels`. Convert separated ASCII markers such as `4 x Lightning Bolt` to `4x Lightning Bolt` before import.

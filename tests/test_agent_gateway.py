@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY = ROOT / "tools" / "agent_gateway.py"
@@ -38,6 +39,10 @@ class GatewayTests(unittest.TestCase):
         data = json.loads(proc.stdout)
         self.assert_envelope(data)
         return proc.returncode, data
+
+    def mock_process(self, gateway, **kwargs):
+        namespace = gateway["_dispatch"].__globals__
+        return mock.patch.dict(namespace, _bounded_process=mock.Mock(**kwargs))
 
     def assert_envelope(self, data):
         self.assertEqual(data["schema_version"], 1)
@@ -134,14 +139,13 @@ class GatewayTests(unittest.TestCase):
 
     def test_validator_replacement_at_launch_cannot_change_executed_bytes(self):
         import runpy
-        from unittest import mock
 
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
         original = (ROOT / "validator" / "MTG_Deck_Validator_v1.1.1.py").read_bytes()
         selected = self.dir / "selected-validator.py"
         selected.write_bytes(original)
         marker = self.dir / "replacement-executed"
-        real_run = subprocess.run
+        real_run = gateway["_bounded_process"]
 
         def replace_at_launch(command, **kwargs):
             selected.write_text(
@@ -158,7 +162,7 @@ class GatewayTests(unittest.TestCase):
         args = gateway["_parser"]().parse_args(
             ["validate", *map(str, self.common()), "--deck", str(self.deck),
              "--validator-file", str(selected)])
-        with mock.patch("subprocess.run", side_effect=replace_at_launch):
+        with self.mock_process(gateway, side_effect=replace_at_launch):
             status, result = gateway["_dispatch"](args)
 
         self.assertFalse(marker.exists(), "Unverified Validator bytes ran")
@@ -171,7 +175,6 @@ class GatewayTests(unittest.TestCase):
         import contextlib
         import io
         import runpy
-        from unittest import mock
         import types
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
         child = types.SimpleNamespace(returncode=0, stdout=b'{"results":[],"coverage":{}}',
@@ -180,7 +183,7 @@ class GatewayTests(unittest.TestCase):
             self.collection.write_text("Name,Quantity\\nShock,1\\n", encoding="utf-8")
             return child
         output = io.StringIO()
-        with mock.patch("subprocess.run", side_effect=mutate):
+        with self.mock_process(gateway, side_effect=mutate):
             with contextlib.redirect_stdout(output):
                 code = gateway["main"](["discover", *map(str, self.common()),
                                         "--theme", "Shock"])
@@ -222,6 +225,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(data["status"], "RUNTIME_COMPONENTS_PRESENT")
         self.assertFalse(data["executed"])
         self.assertTrue(data["checks"]["validator"]["pin_matches"])
+        self.assertIsNone(data["child_exit_code"])
 
     def test_real_card_search_script_with_synthetic_fixture(self):
         code, data = self.invoke("discover", *self.common(), "--theme", "Shock", "--limit", 5)
@@ -232,6 +236,22 @@ class GatewayTests(unittest.TestCase):
         self.assertNotIn("oracle_file", data["result"])
         self.assertEqual(data["oracle_pin_basis"], "CALLER_SPECIFIED_SYNTHETIC_TEST_PIN")
 
+    def test_discovery_reports_unverified_collection_identity(self):
+        oracle = json.loads(self.oracle.read_text(encoding="utf-8"))
+        for canonical in ("First // Shared", "Second // Shared"):
+            oracle["data"][canonical] = [{
+                **oracle["data"]["Shock"][0], "name": canonical,
+                "faceName": "Shared", "layout": "split",
+            }]
+        self.oracle.write_text(json.dumps(oracle), encoding="utf-8")
+        self.pin = hashlib.sha256(self.oracle.read_bytes()).hexdigest()
+        self.collection.write_text("Name,Quantity\nShared,4\n", encoding="utf-8")
+        code, data = self.invoke("discover", *self.common(), "--theme", "Shock")
+        self.assertEqual(code, 0, data)
+        self.assertEqual(data["result"]["collection_coverage"]["identity_status"], "UNVERIFIED")
+        self.assertEqual(data["result"]["results"], [])
+        self.assertIn("COLLECTION_CARD_IDENTITY_UNVERIFIED", data["uncertainties"])
+
     def test_validator_with_complete_synthetic_60_card_deck(self):
         code, data = self.invoke("validate", *self.common(), "--deck", self.deck, "--exact-60")
         self.assertEqual(code, 0, data)
@@ -239,6 +259,91 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(data["result"]["status"], "PASS_WITH_LIMITATIONS")
         self.assertNotIn("source_collection", data["result"])
         self.assertEqual(data["result"]["deck_cards"], 60)
+
+    def test_report_records_verified_source_and_actual_child_exit(self):
+        for action, arguments, expected in (
+                ("doctor", (), None),
+                ("discover", (*self.common(), "--theme", "Shock"), 0),
+                ("validate", (*self.common(), "--deck", self.deck), 0)):
+            with self.subTest(action=action):
+                code, report = self.invoke(action, *arguments)
+                self.assertEqual(code, 0)
+                self.assertEqual(report["child_exit_code"], expected)
+                if action == "discover":
+                    self.assertEqual(report["card_search_sha256"], hashlib.sha256(
+                        (ROOT / "tools" / "card_search.py").read_bytes()).hexdigest())
+                else:
+                    self.assertEqual(report["validator_version"], "1.1.1")
+        self.deck.write_text("55 Plains\n4 Shock\n", encoding="utf-8")
+        code, report = self.invoke("validate", *self.common(), "--deck", self.deck)
+        self.assertEqual(code, 2)
+        self.assertEqual(report["child_exit_code"], 1)
+
+    def test_malformed_collection_is_rejected_by_the_actual_validator(self):
+        for row in ("Shock,NaN", "Shock,4,unexpected", ","):
+            with self.subTest(row=row):
+                self.collection.write_text(f"Name,Quantity\n{row}\n", encoding="utf-8")
+                code, report = self.invoke("validate", *self.common(), "--deck", self.deck)
+                self.assertEqual(code, 3, report)
+                self.assertEqual(report["status"], "UNVERIFIED")
+                self.assertEqual(report["tool_execution"], "FAILED_AFTER_START")
+                self.assertEqual(report["child_exit_code"], 2)
+                self.assertEqual(report["reason_codes"], ["SUBPROCESS_REPORTED_INPUT_ERROR"])
+                self.assertEqual(report["sources"]["validator_profile"], "github-main-v0.2")
+                self.assertTrue(report["sources"]["validator_sha256"])
+                self.assertNotIn("result", report)
+
+    def test_validator_reports_physical_collection_line_and_reason(self):
+        validator = ROOT / "validator" / "MTG_Deck_Validator_v1.1.1.py"
+        header = 'Name,Quantity,Note\nShock,4,"first\nsecond"\n'
+        for suffix, expected in (
+                ("Shock,invalid,note\n", "line 4: invalid Quantity"),
+                ("Shock,1\n", "line 4: wrong number of fields"),
+                ('"unterminated,4,note\n', "line 4: unexpected end of data")):
+            with self.subTest(suffix=suffix):
+                self.collection.write_text(header + suffix, encoding="utf-8")
+                result = subprocess.run(
+                    [sys.executable, str(validator), "--oracle", str(self.oracle),
+                     "--collection", str(self.collection), "--deck", str(self.deck)],
+                    capture_output=True, text=True, cwd=ROOT, timeout=120)
+                self.assertEqual(result.returncode, 2)
+                self.assertFalse(result.stdout)
+                self.assertIn(expected, result.stderr)
+
+    def test_missing_runtime_is_distinct_from_a_child_failure(self):
+        import contextlib
+        import io
+        import runpy
+
+        gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
+        stream = io.StringIO()
+        with mock.patch.object(sys, "executable", str(self.dir / "unavailable-python")):
+            with contextlib.redirect_stdout(stream):
+                doctor_code = gateway["main"](["doctor"])
+                validate_code = gateway["main"](
+                    ["validate", *map(str, self.common()), "--deck", str(self.deck)])
+        doctor, report = map(json.loads, stream.getvalue().splitlines())
+        self.assertEqual(doctor_code, 3)
+        self.assertEqual(doctor["checks"]["python_runtime"]["status"], "UNAVAILABLE")
+        self.assertEqual(validate_code, 3)
+        self.assertEqual(report["status"], "UNVERIFIED")
+        self.assertEqual(report["tool_execution"], "NOT_EXECUTED")
+        self.assertIsNone(report["child_exit_code"])
+        self.assertEqual(report["reason_codes"], ["SUBPROCESS_NOT_STARTED"])
+        self.assertTrue(report["sources"]["validator_sha256"])
+
+    def test_child_ignores_python_startup_hooks(self):
+        import os
+
+        marker = self.dir / "sitecustomize-loaded"
+        (self.dir / "sitecustomize.py").write_text(
+            f"from pathlib import Path\nPath({str(marker)!r}).touch()\n", encoding="utf-8")
+        with mock.patch.dict(os.environ, {"PYTHONPATH": str(self.dir)}):
+            proc = subprocess.run(
+                [sys.executable, "-I", str(GATEWAY), "discover", *map(str, self.common()),
+                 "--theme", "Shock"], capture_output=True, text=True, cwd=ROOT, timeout=120)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse(marker.exists())
 
     def test_invalid_deck_is_not_a_positive(self):
         self.deck.write_text("55 Plains\n4 Shock\n", encoding="utf-8")
@@ -350,17 +455,18 @@ class GatewayTests(unittest.TestCase):
         import contextlib
         import io
         import runpy
-        from unittest import mock
         import types
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
         for bad, expected in (
                 (b'{"status":"PASS","status":"FAIL"}', "SUBPROCESS_DUPLICATE_JSON_KEY"),
                 (b'{"results":[],"coverage":{},"score":NaN}',
+                 "SUBPROCESS_NONFINITE_JSON_NUMBER"),
+                (b'{"results":[],"coverage":{},"score":1e400}',
                  "SUBPROCESS_NONFINITE_JSON_NUMBER")):
             with self.subTest(expected=expected):
                 child = types.SimpleNamespace(returncode=0, stdout=bad, stderr=b"")
                 stream = io.StringIO()
-                with mock.patch("subprocess.run", return_value=child):
+                with self.mock_process(gateway, return_value=child):
                     with contextlib.redirect_stdout(stream):
                         code = gateway["main"](["discover", *map(str, self.common()),
                                                "--theme", "Shock"])
@@ -375,10 +481,9 @@ class GatewayTests(unittest.TestCase):
         import contextlib
         import io
         import runpy
-        from unittest import mock
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
         stream = io.StringIO()
-        with mock.patch("subprocess.run", side_effect=OSError("private detail")):
+        with mock.patch("subprocess.Popen", side_effect=OSError("private detail")):
             with contextlib.redirect_stdout(stream):
                 code = gateway["main"](["discover", *map(str, self.common()),
                                        "--theme", "Shock"])
@@ -395,12 +500,11 @@ class GatewayTests(unittest.TestCase):
         import contextlib
         import io
         import runpy
-        from unittest import mock
         import types
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
         child = types.SimpleNamespace(returncode=0, stdout=b"not-json", stderr=b"")
         stream = io.StringIO()
-        with mock.patch("subprocess.run", return_value=child):
+        with self.mock_process(gateway, return_value=child):
             with contextlib.redirect_stdout(stream):
                 code = gateway["main"](["discover", *map(str, self.common()),
                                        "--theme", "Shock"])
@@ -413,6 +517,46 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(data["action"], "discover")
 
 
+
+    def test_real_child_crash_timeout_and_output_cap(self):
+        import runpy
+
+        gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
+        namespace = gateway["_run"].__globals__
+        fixture = self.dir / "synthetic-child.py"
+        for script, expected, settings in (
+                ("raise SystemExit(7)", "SUBPROCESS_JSON_INVALID", {}),
+                ("import time; time.sleep(10)", "SUBPROCESS_TIMED_OUT", {"CHILD_TIMEOUT": 0.2}),
+                ("print('X' * 100000)", "SUBPROCESS_OUTPUT_TOO_LARGE", {"MAX_STDOUT": 256}),
+                ("import sys; print('X' * 100000, file=sys.stderr)",
+                 "SUBPROCESS_OUTPUT_TOO_LARGE", {"MAX_STDERR": 256})):
+            with self.subTest(reason=expected, script=script):
+                fixture.write_text(script, encoding="utf-8")
+                with mock.patch.dict(namespace, settings):
+                    with self.assertRaises(gateway["GatewayError"]) as raised:
+                        gateway["_run"](fixture, [], input_error_prefix=b"INPUT ERROR: ")
+                self.assertEqual(raised.exception.reason, expected)
+                self.assertTrue(raised.exception.executed)
+                self.assertIsInstance(raised.exception.child_exit_code, int)
+                if script == "raise SystemExit(7)":
+                    self.assertEqual(raised.exception.child_exit_code, 7)
+
+    def test_unhashable_validator_status_fails_closed(self):
+        import contextlib
+        import io
+        import runpy
+
+        gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
+        stream = io.StringIO()
+        child = subprocess.CompletedProcess([], 0, stdout=b'{"status":[]}', stderr=b"")
+        with self.mock_process(gateway, return_value=child), contextlib.redirect_stdout(stream):
+            code = gateway["main"](
+                ["validate", *map(str, self.common()), "--deck", str(self.deck)])
+        data = json.loads(stream.getvalue())
+        self.assertEqual(code, 3)
+        self.assertEqual(data["tool_execution"], "FAILED_AFTER_START")
+        self.assertEqual(data["child_exit_code"], 0)
+        self.assertEqual(data["reason_codes"], ["VALIDATOR_STATUS_EXIT_CONTRADICTION"])
 
     def test_doctor_checks_pinned_card_search_and_rejects_mutated_code(self):
         import runpy
@@ -434,7 +578,6 @@ class GatewayTests(unittest.TestCase):
         import contextlib
         import io
         import runpy
-        from unittest import mock
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
         root_globals = gateway["_dispatch"].__globals__
         candidate = self.dir / "unapproved-card-search.py"
@@ -442,7 +585,7 @@ class GatewayTests(unittest.TestCase):
                               b"\n# this must not run\n")
         root_globals["CARD_SEARCH"] = candidate
         output = io.StringIO()
-        with mock.patch("subprocess.run", side_effect=AssertionError("spawned unapproved code")):
+        with self.mock_process(gateway, side_effect=AssertionError("spawned unapproved code")):
             with contextlib.redirect_stdout(output):
                 code = gateway["main"](["discover", *map(str, self.common()),
                                          "--theme", "Shock"])
@@ -454,7 +597,6 @@ class GatewayTests(unittest.TestCase):
 
     def test_discover_executes_captured_code_even_when_original_is_swapped_at_launch(self):
         import runpy
-        from unittest import mock
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
         root_globals = gateway["_dispatch"].__globals__
         original = (ROOT / "tools" / "card_search.py").read_bytes()
@@ -462,11 +604,11 @@ class GatewayTests(unittest.TestCase):
         candidate.write_bytes(original)
         root_globals["CARD_SEARCH"] = candidate
         marker = self.dir / "unapproved-code-executed"
-        real_run = subprocess.run
+        real_run = gateway["_bounded_process"]
         executed_script = []
 
         def swap_at_launch(command, **kwargs):
-            script = Path(command[2])
+            script = Path(command[5])
             executed_script.append(script)
             self.assertNotEqual(script, candidate)
             self.assertEqual(script.read_bytes(), original)
@@ -480,7 +622,7 @@ class GatewayTests(unittest.TestCase):
 
         args = gateway["_parser"]().parse_args(
             ["discover", *map(str, self.common()), "--theme", "Shock"])
-        with mock.patch("subprocess.run", side_effect=swap_at_launch):
+        with self.mock_process(gateway, side_effect=swap_at_launch):
             status, result = gateway["_dispatch"](args)
         self.assertEqual(status, "CANDIDATES_NOT_VALIDATED")
         self.assertTrue(result["result"]["results"])
@@ -490,9 +632,8 @@ class GatewayTests(unittest.TestCase):
 
     def test_inputs_are_snapshots_even_if_originals_are_replaced_at_launch(self):
         import runpy
-        from unittest import mock
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
-        real_run = subprocess.run
+        real_run = gateway["_bounded_process"]
         originals = {p: p.read_bytes() for p in (self.oracle, self.collection, self.deck)}
         cases = (("discover", ["--theme", "Shock"], "CANDIDATES_NOT_VALIDATED"),
                  ("validate", ["--deck", str(self.deck), "--exact-60"],
@@ -521,7 +662,7 @@ class GatewayTests(unittest.TestCase):
 
             args = gateway["_parser"]().parse_args(
                 [action, *map(str, self.common()), *extra])
-            with mock.patch("subprocess.run", side_effect=swap_inputs_at_launch):
+            with self.mock_process(gateway, side_effect=swap_inputs_at_launch):
                 status, result = gateway["_dispatch"](args)
             self.assertEqual(status, expected)
             self.assertEqual(len(observed), 3 if action == "validate" else 2)
@@ -534,9 +675,8 @@ class GatewayTests(unittest.TestCase):
         import contextlib
         import io
         import runpy
-        from unittest import mock
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
-        real_run = subprocess.run
+        real_run = gateway["_bounded_process"]
         original = self.collection.read_bytes()
         staged_paths = []
 
@@ -552,7 +692,7 @@ class GatewayTests(unittest.TestCase):
 
         output = io.StringIO()
         try:
-            with mock.patch("subprocess.run", side_effect=permanently_change_original):
+            with self.mock_process(gateway, side_effect=permanently_change_original):
                 with contextlib.redirect_stdout(output):
                     code = gateway["main"](["discover", *map(str, self.common()),
                                              "--theme", "Shock"])
@@ -571,19 +711,18 @@ class GatewayTests(unittest.TestCase):
         import io
         import runpy
         import types
-        from unittest import mock
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
         saved_paths = []
 
         def failed_child(command, **kwargs):
             args = list(map(str, command))
-            saved_paths.extend([Path(args[2]), Path(args[args.index("--oracle") + 1]),
+            saved_paths.extend([Path(args[5]), Path(args[args.index("--oracle") + 1]),
                                 Path(args[args.index("--collection") + 1])])
             self.assertTrue(all(path.is_file() for path in saved_paths))
             return types.SimpleNamespace(returncode=0, stdout=b"not json", stderr=b"")
 
         output = io.StringIO()
-        with mock.patch("subprocess.run", side_effect=failed_child):
+        with self.mock_process(gateway, side_effect=failed_child):
             with contextlib.redirect_stdout(output):
                 code = gateway["main"](["discover", *map(str, self.common()),
                                          "--theme", "Shock"])

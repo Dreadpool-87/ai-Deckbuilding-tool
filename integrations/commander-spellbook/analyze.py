@@ -15,7 +15,9 @@ import re
 import sys
 
 SOURCE_URL = 'https://json.commanderspellbook.com/variants.json.gz'
-ENTRY = re.compile(r'^\s*(\d+)\s*(?:[xX×]\s*)?(.+?)\s*$')
+# An ASCII x marker must attach to the quantity and be followed by whitespace.
+# Keep the grammar identical in the standalone Validator and Spellbook analyzer.
+ENTRY = re.compile(r'^([0-9]+)(?:[xX]\s+|×\s*|\s+)(\S.*)$')
 SECTIONS = {
     'deck': 'main', 'main': 'main', 'mainboard': 'main', 'main deck': 'main',
     'commander': 'commander', 'commanders': 'commander',
@@ -40,7 +42,7 @@ def read_deck(path: Path) -> tuple[Counter, Counter]:
         if section == 'reject':
             raise ValueError(f'{path}:{lineno}: sideboard/maybeboard not supported')
         match = ENTRY.fullmatch(line)
-        if not match or not match.group(2).strip():
+        if not match:
             raise ValueError(f'{path}:{lineno}: malformed card line: {line!r}')
         count, card = int(match.group(1)), match.group(2).strip()
         if count <= 0:

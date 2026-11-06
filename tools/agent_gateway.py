@@ -7,8 +7,10 @@ Source profiles are explicitly selected; no cross-environment automatic fallback
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -21,9 +23,10 @@ ROOT = Path(__file__).resolve().parent.parent
 CARD_SEARCH = ROOT / "tools" / "card_search.py"
 VALIDATOR = ROOT / "validator" / "MTG_Deck_Validator_v1.1.1.py"
 ORACLE_PIN = "eb3c03c9303bbf17d50569320f0ab3a7a1d412511198805a36eec03cffff3468"
-VALIDATOR_PIN = "f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef"
-CARD_SEARCH_PIN = "024de9aaaa1994ab6bce6944bd62e237f9fa9ea0ab52ed5b8bca8aca93a6851e"
+VALIDATOR_PIN = "ffe3f958c342b70804941e6cec6604544d027cb8141aaf502f7749120f76bac0"
+CARD_SEARCH_PIN = "c5ceabbaf98d837e0e72598a15906c085c41eb26da74303a408342ff62d7c4e8"
 VERSION = "0.3.0-experimental"
+VALIDATOR_VERSION = "1.1.1"
 SCHEMA_VERSION = 1
 DEFAULT_VALIDATOR_PROFILE = "github-main-v0.2"
 VALIDATOR_PROFILES = {
@@ -34,14 +37,18 @@ VALIDATOR_PROFILES = {
 MAX_DATA = 128 * 1024 * 1024
 MAX_SMALL = 4 * 1024 * 1024
 MAX_STDOUT = 2 * 1024 * 1024
+MAX_STDERR = 128 * 1024
+CHILD_TIMEOUT = 90
 
 
 class GatewayError(Exception):
-    def __init__(self, reason: str, *, executed: bool = False):
+    def __init__(self, reason: str, *, executed: bool = False,
+                 child_exit_code: int | None = None):
         super().__init__(reason)
         self.reason = reason
-        # True only when the child script has actually been started.
+        # True only when the downstream process has actually been launched.
         self.executed = executed
+        self.child_exit_code = child_exit_code
 
 
 class _SafeParser(argparse.ArgumentParser):
@@ -154,14 +161,15 @@ def _stage_verified_script(destination: Path, content: bytes, expected: str) -> 
     return destination
 
 
-def _unchanged(paths: tuple[tuple[Path, str, int], ...]) -> None:
+def _unchanged(paths: tuple[tuple[Path, str, int], ...], child_exit_code: int) -> None:
     """Reject detectable source changes between validation and child completion."""
     try:
         for path, expected, max_bytes in paths:
             if _sha(_file(path, max_bytes)) != expected:
-                raise GatewayError("SOURCE_CHANGED_DURING_EXECUTION", executed=True)
-    except GatewayError as exc:
-        raise GatewayError("SOURCE_CHANGED_DURING_EXECUTION", executed=True) from None
+                raise GatewayError("SOURCE_CHANGED_DURING_EXECUTION")
+    except GatewayError:
+        raise GatewayError("SOURCE_CHANGED_DURING_EXECUTION", executed=True,
+                           child_exit_code=child_exit_code) from None
 
 
 def _sources(args: argparse.Namespace, stage: Path, *, validate: bool
@@ -211,35 +219,86 @@ def _reject_json_constant(value: str) -> None:
     raise GatewayError("SUBPROCESS_NONFINITE_JSON_NUMBER", executed=True)
 
 
-def _run(script: Path, args: list[str]) -> tuple[int, dict]:
-    script = _file(script, MAX_SMALL)
+def _finite_json_float(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        _reject_json_constant(value)
+    return number
+
+
+def _bounded_process(command: list[str]) -> subprocess.CompletedProcess:
+    """Drain both pipes concurrently, terminating the child at either output cap."""
     try:
-        completed = subprocess.run(
-            [sys.executable, "-B", str(script), *args],
-            cwd=str(ROOT), capture_output=True, timeout=90, check=False,
-        )
-    except subprocess.TimeoutExpired:
-        raise GatewayError("SUBPROCESS_TIMED_OUT", executed=True) from None
+        process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except OSError:
         raise GatewayError("SUBPROCESS_NOT_STARTED") from None
-    if len(completed.stdout) > MAX_STDOUT or len(completed.stderr) > 128 * 1024:
-        raise GatewayError("SUBPROCESS_OUTPUT_TOO_LARGE", executed=True)
+
+    def capture(pipe, limit: int) -> bytes:
+        content = pipe.read(limit + 1)
+        if len(content) > limit:
+            process.kill()
+        return content
+
+    with process, ThreadPoolExecutor(max_workers=2) as readers:
+        out = readers.submit(capture, process.stdout, MAX_STDOUT)
+        err = readers.submit(capture, process.stderr, MAX_STDERR)
+        try:
+            process.wait(timeout=CHILD_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            raise GatewayError("SUBPROCESS_TIMED_OUT", executed=True,
+                               child_exit_code=process.wait()) from None
+        try:
+            return subprocess.CompletedProcess(command, process.returncode,
+                                               out.result(), err.result())
+        except OSError:
+            raise GatewayError("SUBPROCESS_OUTPUT_READ_FAILED", executed=True,
+                               child_exit_code=process.returncode) from None
+
+
+def _run(script: Path, args: list[str], *, input_error_prefix: bytes) -> tuple[int, dict]:
+    script = _file(script, MAX_SMALL)
+    if not sys.executable:
+        raise GatewayError("SUBPROCESS_NOT_STARTED")
+    # Run only the staged standard-library tool. Host PYTHONPATH and startup
+    # hooks must not run in the interpreter used as source-backed evidence.
+    completed = _bounded_process([sys.executable, "-I", "-S", "-B", "-Xutf8", str(script), *args])
+    exit_code = completed.returncode
+    if len(completed.stdout) > MAX_STDOUT or len(completed.stderr) > MAX_STDERR:
+        raise GatewayError("SUBPROCESS_OUTPUT_TOO_LARGE", executed=True,
+                           child_exit_code=exit_code)
+    if exit_code == 2 and not completed.stdout and completed.stderr.startswith(input_error_prefix):
+        raise GatewayError("SUBPROCESS_REPORTED_INPUT_ERROR", executed=True,
+                           child_exit_code=exit_code)
     try:
         payload = json.loads(completed.stdout.decode("utf-8"),
                              object_pairs_hook=_distinct_json_object,
-                             parse_constant=_reject_json_constant)
-    except (UnicodeError, ValueError):
-        raise GatewayError("SUBPROCESS_JSON_INVALID", executed=True) from None
+                             parse_constant=_reject_json_constant,
+                             parse_float=_finite_json_float)
+    except GatewayError as exc:
+        raise GatewayError(exc.reason, executed=True, child_exit_code=exit_code) from None
+    except (UnicodeError, ValueError, RecursionError):
+        raise GatewayError("SUBPROCESS_JSON_INVALID", executed=True,
+                           child_exit_code=exit_code) from None
     if not isinstance(payload, dict):
-        raise GatewayError("SUBPROCESS_SCHEMA_INVALID", executed=True)
-    return completed.returncode, payload
+        raise GatewayError("SUBPROCESS_SCHEMA_INVALID", executed=True,
+                           child_exit_code=exit_code)
+    return exit_code, payload
 
 
 def _doctor(args: argparse.Namespace) -> tuple[str, dict]:
     if args.validator_profile != DEFAULT_VALIDATOR_PROFILE and args.validator_file is None:
         raise GatewayError("EXPLICIT_VALIDATOR_FILE_REQUIRED")
     chosen = args.validator_file or VALIDATOR
-    checks = {}
+    runtime_available = bool(sys.executable) and Path(sys.executable).is_file() and os.access(
+        sys.executable, os.X_OK)
+    checks = {"python_runtime": {
+        "status": "AVAILABLE" if runtime_available else "UNAVAILABLE",
+        "version": ".".join(map(str, sys.version_info[:3])),
+    }}
+    if not runtime_available:
+        checks["python_runtime"]["reason"] = "PYTHON_EXECUTABLE_UNAVAILABLE"
     for label, path, expected in (("card_search", CARD_SEARCH, CARD_SEARCH_PIN),
                                   ("validator", chosen,
                                    VALIDATOR_PROFILES[args.validator_profile])):
@@ -262,11 +321,14 @@ def _doctor(args: argparse.Namespace) -> tuple[str, dict]:
             }
         except GatewayError as exc:
             checks["oracle"] = {"status": "UNAVAILABLE", "reason": exc.reason}
-    ready = (checks["card_search"]["pin_matches"]
+    ready = (runtime_available and checks["card_search"]["pin_matches"]
              and checks["validator"]["pin_matches"]
              and ("oracle" not in checks or checks["oracle"].get("matches_slim_pin") is True))
     return ("RUNTIME_COMPONENTS_PRESENT" if ready else "UNVERIFIED"), {
         "validator_profile": args.validator_profile,
+        "validator_version": VALIDATOR_VERSION if checks["validator"]["pin_matches"] else None,
+        "card_search_sha256": (checks["card_search"]["sha256"]
+                               if checks["card_search"]["pin_matches"] else None),
         "checks": checks,
         "limitations": [
             "Doctor verifies selected local source hashes, not complete rules or card validity.",
@@ -275,7 +337,10 @@ def _doctor(args: argparse.Namespace) -> tuple[str, dict]:
     }
 
 
-def _dispatch(args: argparse.Namespace) -> tuple[str, dict]:
+def _dispatch(args: argparse.Namespace, context: dict | None = None) -> tuple[str, dict]:
+    context = {} if context is None else context
+    if args.action in ("doctor", "validate"):
+        context["validator_profile"] = args.validator_profile
     if args.action == "doctor":
         return _doctor(args)
     if args.collection_scope == "current-run-confirmed" and not args.collection_confirmed:
@@ -287,19 +352,21 @@ def _dispatch(args: argparse.Namespace) -> tuple[str, dict]:
     # be overridden by CLI input, and only the captured bytes run.
     selected_validator, selected_validator_sha, validator_bytes = (
         _validator_file(args) if args.action == "validate" else (None, None, None))
+    if selected_validator is not None:
+        context.update(validator_version=VALIDATOR_VERSION, validator_sha256=selected_validator_sha)
     card_search_bytes = None
     if args.action == "discover":
         card_search_sha, card_search_bytes = _pinned_script(
             CARD_SEARCH, CARD_SEARCH_PIN, "CARD_SEARCH_SHA256_MISMATCH")
+        context["card_search_sha256"] = card_search_sha
 
+    rc = None
     try:
         with tempfile.TemporaryDirectory(prefix="mtg-agent-gateway-") as directory:
             stage = Path(directory)
-            oracle, collection, deck, context, tracked = _sources(
+            oracle, collection, deck, input_context, tracked = _sources(
                 args, stage, validate=args.action == "validate")
-            if selected_validator is not None:
-                context["validator_profile"] = args.validator_profile
-                context["validator_sha256"] = selected_validator_sha
+            context.update(input_context)
             if args.action == "discover":
                 if not 1 <= args.limit <= 100 or not 0 <= args.offset <= 1000000:
                     raise GatewayError("INVALID_SEARCH_BOUNDS")
@@ -312,13 +379,18 @@ def _dispatch(args: argparse.Namespace) -> tuple[str, dict]:
                     command.extend(("--identity", args.identity))
                 verified_search = _stage_verified_script(
                     stage / "card_search.py", card_search_bytes, card_search_sha)
-                rc, data = _run(verified_search, command)
-                _unchanged(tracked + ((CARD_SEARCH, card_search_sha, MAX_SMALL),))
-                if rc != 0 or not isinstance(data.get("results"), list) or "coverage" not in data:
-                    raise GatewayError("DISCOVERY_FAILED_OR_SCHEMA_UNEXPECTED", executed=True)
+                rc, data = _run(verified_search, command,
+                                input_error_prefix=b"NOT_EXECUTED: ")
+                _unchanged(tracked + ((CARD_SEARCH, card_search_sha, MAX_SMALL),), rc)
+                if (rc != 0 or not isinstance(data.get("results"), list)
+                        or not isinstance(data.get("coverage"), dict)
+                        or not isinstance(data.get("collection_coverage", {}), dict)
+                        or not isinstance(data.get("name_identity", {}), dict)):
+                    raise GatewayError("DISCOVERY_FAILED_OR_SCHEMA_UNEXPECTED", executed=True,
+                                       child_exit_code=rc)
                 data.pop("oracle_file", None)  # Never expose snapshot paths.
                 return "CANDIDATES_NOT_VALIDATED", {
-                    **context, "result": data, "limitations": [
+                    **context, "child_exit_code": rc, "result": data, "limitations": [
                         "Search matches and role labels are heuristics, not legal deck or swap proof.",
                         "Ownership is supplied by the caller; current-run consent is not cryptographically authenticated.",
                     ],
@@ -331,12 +403,15 @@ def _dispatch(args: argparse.Namespace) -> tuple[str, dict]:
                 command.append("--exact-60")
             verified_validator = _stage_verified_script(
                 stage / "validator.py", validator_bytes, selected_validator_sha)
-            rc, data = _run(verified_validator, command)
-            _unchanged(tracked + ((selected_validator, selected_validator_sha, MAX_SMALL),))
+            rc, data = _run(verified_validator, command, input_error_prefix=b"INPUT ERROR: ")
+            _unchanged(tracked + ((selected_validator, selected_validator_sha, MAX_SMALL),), rc)
             allowed = {"PASS_WITH_LIMITATIONS": 0, "FAIL": 1, "UNVERIFIED": 3}
             status = data.get("status")
-            if status not in allowed or rc != allowed[status]:
-                raise GatewayError("VALIDATOR_STATUS_EXIT_CONTRADICTION", executed=True)
+            if not isinstance(status, str) or status not in allowed or rc != allowed[status]:
+                raise GatewayError("VALIDATOR_STATUS_EXIT_CONTRADICTION", executed=True,
+                                   child_exit_code=rc)
+            if not isinstance(data.get("checks"), dict):
+                raise GatewayError("SUBPROCESS_SCHEMA_INVALID", executed=True, child_exit_code=rc)
             for field in ("source_collection", "source_oracle", "source_deck"):
                 data.pop(field, None)
             return ({
@@ -344,14 +419,15 @@ def _dispatch(args: argparse.Namespace) -> tuple[str, dict]:
                 "FAIL": "BLOCKED_INVALID_DECK",
                 "UNVERIFIED": "UNVERIFIED",
             }[status], {
-                **context, "result": data,
+                **context, "child_exit_code": rc, "result": data,
                 "limitations": [
                     "This checks the stated deck and declared collection; collection confirmation is not authenticated.",
                     "Validation is not proof of strategic superiority, full legality, gameplay or castability.",
                 ],
             })
     except OSError:
-        raise GatewayError("INPUT_OR_STAGING_FAILED") from None
+        raise GatewayError("INPUT_OR_STAGING_FAILED", executed=rc is not None,
+                           child_exit_code=rc) from None
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -439,8 +515,13 @@ def _result_envelope(action: str, status: str, executed: bool, info: dict,
                 "scope": "HEURISTIC_NOT_RULES_VERIFIED",
             })
             uncertainties.append("CANDIDATES_NOT_DECK_VALIDATED")
-            if (child.get("collection_coverage") or {}).get("unresolved_name_count", 0):
+            collection_coverage = child.get("collection_coverage", {})
+            if collection_coverage.get("unresolved_name_count", 0):
                 uncertainties.append("ORACLE_COLLECTION_COVERAGE_INCOMPLETE")
+            if collection_coverage.get("identity_status") == "UNVERIFIED":
+                uncertainties.append("COLLECTION_CARD_IDENTITY_UNVERIFIED")
+            if child.get("name_identity", {}).get("status") == "UNVERIFIED":
+                uncertainties.append("CARD_NAME_IDENTITY_UNVERIFIED")
         elif action == "validate":
             derivations.append({
                 "code": "CASUAL_VALIDATOR_OUTCOME", "basis": "PINNED_EXPLICIT_VALIDATOR_PROFILE",
@@ -460,6 +541,9 @@ def _result_envelope(action: str, status: str, executed: bool, info: dict,
         "schema_version": SCHEMA_VERSION, "gateway_version": VERSION,
         "action": action, "status": status, "executed": executed,
         "tool_execution": tool_execution, "sources": sources,
+        "child_exit_code": info.get("child_exit_code"),
+        "validator_version": info.get("validator_version"),
+        "card_search_sha256": info.get("card_search_sha256"),
         "evidence": {"facts": facts, "derivations": derivations,
                      "hypotheses": hypotheses},
         "reason_codes": reasons, "uncertainties": sorted(set(uncertainties)),
@@ -473,9 +557,10 @@ def _result_envelope(action: str, status: str, executed: bool, info: dict,
 def main(argv: list[str] | None = None) -> int:
     supplied = sys.argv[1:] if argv is None else argv
     safe_action = supplied[0] if supplied and supplied[0] in ("doctor", "discover", "validate") else "UNKNOWN"
+    context = {}
     try:
         args = _parser().parse_args(supplied)
-        status, info = _dispatch(args)
+        status, info = _dispatch(args, context)
         report = _result_envelope(args.action, status, args.action != "doctor", info)
         code = (0 if status in ("RUNTIME_COMPONENTS_PRESENT", "CANDIDATES_NOT_VALIDATED",
                                 "VALIDATED_WITH_LIMITATIONS") else
@@ -483,12 +568,12 @@ def main(argv: list[str] | None = None) -> int:
     except GatewayError as exc:
         status = ("UNVERIFIED" if exc.executed or exc.reason == "SUBPROCESS_NOT_STARTED"
                   else "INPUT_ERROR")
-        info = {"reason": exc.reason,
+        info = {**context, "reason": exc.reason, "child_exit_code": exc.child_exit_code,
                 "limitations": ["No trusted result can be inferred from a failed command."]}
         report = _result_envelope(safe_action, status, exc.executed, info,
                                   execution_failed=exc.executed)
         code = 3 if status == "UNVERIFIED" else 2
-    print(json.dumps(report, sort_keys=True, ensure_ascii=False, allow_nan=False))
+    print(json.dumps(report, sort_keys=True, allow_nan=False))
     return code
 
 

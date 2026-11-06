@@ -90,6 +90,8 @@ class RulesSourceTests(unittest.TestCase):
         workflow = (pathlib.Path(__file__).resolve().parents[1] /
                     ".github/workflows/mtg-rules-check.yml").read_text(encoding="utf-8")
         self.assertIn("steps.inspect.outputs.change_type", workflow)
+        self.assertIn("env:\n          RULES_CHANGE_TYPE: ${{ steps.inspect.outputs.change_type }}", workflow)
+        self.assertIn('[[ "$RULES_CHANGE_TYPE" == "html_review" ]]', workflow)
         self.assertIn("HTML_ONLY_REVIEW_REQUIRED", workflow)
         self.assertIn("BLOCKING_SOURCE_REVIEW_REQUIRED", workflow)
         self.assertIn("manual review required", workflow)

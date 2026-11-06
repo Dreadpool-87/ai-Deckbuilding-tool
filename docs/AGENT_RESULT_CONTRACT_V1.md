@@ -4,15 +4,17 @@
 
 ## Consumer rule: one authoritative gateway status
 
-The JSON returned by `python tools/agent_gateway.py doctor|discover|validate` contains the following required fields:
+The JSON returned by `python tools/agent_gateway.py doctor|discover|validate` emits the fields below. The three new execution and source fields are optional in the schema so consumers can still validate earlier v1 reports.
 
 | Field | Meaning |
 | --- | --- |
 | `schema_version: 1` | Version of this common output contract, independent of tool/Validator versions |
 | `gateway_version` | Versioned implementation that emitted this report |
 | `action`, `status` | Requested supported action and **one authoritative gateway result** |
-| `executed` | **True only if an actual downstream child script was started**; local `doctor` checks are not child execution |
+| `executed` | **True only if the downstream process was launched**; local `doctor` checks are not child execution |
 | `tool_execution` | `NOT_EXECUTED`, `EXECUTED`, or `FAILED_AFTER_START` |
+| `child_exit_code` | Observed child process exit code, including its termination code when known; null for doctor or failed launch |
+| `validator_version`, `card_search_sha256` | Verified source identity fields when applicable, otherwise null |
 | `sources` | Observed file hashes (when available), explicitly selected Validator profile, collection declaration and authentication boundary |
 | `evidence.facts` | Narrow facts such as local SHA-256 bytes matching a supplied expectation, **not card-rule correctness** |
 | `evidence.derivations` | Executed, bounded mechanical/structural deductions, with a named scope |
@@ -28,13 +30,14 @@ The full machine-readable schema is [`schemas/agent_gateway_result_v1.schema.jso
 
 | Action | Gateway status | Meaning | Exit |
 | --- | --- | --- | --- |
-| doctor | `RUNTIME_COMPONENTS_PRESENT` | Readable scripts; expected local Validator hash matched; **no deck test** | 0 |
+| doctor | `RUNTIME_COMPONENTS_PRESENT` | Local interpreter path available and pinned scripts readable; **no child process or deck test** | 0 |
 | doctor | `UNVERIFIED` | One or more required local components not established | 3 |
 | discover | `CANDIDATES_NOT_VALIDATED` | Card Search script executed and emitted candidate data; no deck/strategy proof | 0 |
 | validate | `VALIDATED_WITH_LIMITATIONS` | Existing Casual Validator reported structural `PASS_WITH_LIMITATIONS` with matching exit | 0 |
 | validate | `BLOCKED_INVALID_DECK` | Existing Validator reported `FAIL`; blocked from positive deck conclusions | 2 |
 | validate | `UNVERIFIED` | Existing Validator could not establish full scoped validation | 3 |
 | any | `INPUT_ERROR` | Bad/missing/unsafe inputs or failed preconditions; child not started | 2 |
+| launch failure | `UNVERIFIED` | `NOT_EXECUTED` with `SUBPROCESS_NOT_STARTED`, for example when Python cannot be launched | 3 |
 | downstream failure | `UNVERIFIED` | Child started but timed out or returned unusable/contradictory output; no trusted result | 3 |
 
 `--help` prints ordinary human-readable argparse help. Invalid CLI arguments, however, produce a structured JSON `INPUT_ERROR` with `INVALID_ARGUMENTS`, without echoing user-provided paths.
@@ -43,13 +46,9 @@ The full machine-readable schema is [`schemas/agent_gateway_result_v1.schema.jso
 
 The v1 contract now requires `sources.validator_profile`, one of `github-main-v0.2`, `project-prepare-candidate`, `frozen-beta-20261022` or null when not selected. A **profile is only a declared selection**; it is not proof of local execution. The gateway compares the selected local Validator bytes against the corresponding fixed SHA-256 and rejects mismatches. See [P4 compatibility details](AGENT_SOURCE_COMPATIBILITY_P4.md). No alternate-runtime GO is implied.
 
-## P4 Validator profile identity
-
-The v1 schema now includes `sources.validator_profile`: the explicitly selected `github-main-v0.2`, `project-prepare-candidate` or `frozen-beta-20261022` profile, or null for actions without a selected Validator. A profile is **not** independent proof of source authenticity; the runtime must hash the selected local bytes, then fail closed on mismatches. See [P4 Source Compatibility](AGENT_SOURCE_COMPATIBILITY_P4.md).
-
 ## Pinned execution and input snapshots
 
-The Gateway pins Card Search code (`doctor.checks.card_search.pin_matches`) and executes SHA-checked, staged code bytes. The underlying tool reads staged snapshots of the declared Oracle and collection, and additionally the deck for validation. `sources.*_sha256` correspond to those captured snapshots, not authenticated ownership. A change of the original files detected after execution still invalidates the result with `UNVERIFIED`. This work does not change `schema_version`, permitted statuses, successful exitcodes or the nested child-result meaning.
+The Gateway pins Card Search code (`doctor.checks.card_search.pin_matches`) and executes SHA-checked, staged code bytes. The underlying tool reads staged snapshots of the declared Oracle and collection, and additionally the deck for validation. `sources.*_sha256` correspond to those captured snapshots, not authenticated ownership. A change of the original files detected after execution still invalidates the result with `UNVERIFIED`. The v1 execution fields are additive. Gateway and child exit codes are independent; for example, an invalid deck uses gateway exit 2 and child exit 1. Python children ignore interpreter startup hooks, and stdout/stderr are bounded during capture. The timeout applies to the pinned standalone tools, which do not launch descendant processes. The gateway rejects missing, malformed, contradictory or oversized output without forwarding child stderr. `SUBPROCESS_REPORTED_INPUT_ERROR` means the child rejected an input. To diagnose the exact line, inspect the direct tool's error locally.
 
 ## Sources and evidence
 
@@ -65,14 +64,18 @@ The Gateway pins Card Search code (`doctor.checks.card_search.pin_matches`) and 
 ```json
 {
   "schema_version": 1,
-  "gateway_version": "0.2.0-experimental",
+  "gateway_version": "0.3.0-experimental",
   "action": "discover",
   "status": "CANDIDATES_NOT_VALIDATED",
   "executed": true,
   "tool_execution": "EXECUTED",
+  "child_exit_code": 0,
+  "validator_version": null,
+  "card_search_sha256": null,
   "sources": {
     "oracle_sha256": null,
     "validator_sha256": null,
+    "validator_profile": null,
     "collection_sha256": null,
     "deck_sha256": null,
     "collection_scope": "synthetic",

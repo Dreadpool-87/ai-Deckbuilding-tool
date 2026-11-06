@@ -1,11 +1,8 @@
 # AI Deckbuilding Tool — Current Project Status
 
-**As of:** 2026-11-01 (Casual Private Beta v0.2 verified for GitHub, prior 2026-10-22 frozen checkpoint retained; ChatGPT Project v1.6 remains separately pinned)  
-**Lifecycle:** `ACTIVE_PRIVATE_BETA`; prior Casual alpha `SUPERSEDED / HISTORICAL`.  
-**Visibility:** Public experimental source preview. The PRIVATE beta status below describes the original project's historical acceptance, not a public stable release. Do not upload personal collections.  
-**Purpose:** The single starting point for the current state of this repository and future ChatGPT Project handoffs.
+**Public lifecycle:** `PUBLIC_TEST_PREVIEW`. The public repository supports experimental source testing and the Casual Builder/Validator/Tester workflow. See [public testing](PUBLIC_TESTING.md), [verification evidence](docs/PUBLIC_PREVIEW_AUDIT.md), and the [active Gateway source pins](docs/AGENT_SOURCE_COMPATIBILITY_P4.md). The audit remediation targets the public preview. Its tests establish only the coverage recorded in the verification evidence.
 
-> **Current decision:** `PRIVATE_BETA_V0_2` **approved for scoped private Casual use**, lifecycle `ACTIVE_PRIVATE_BETA` with `PASS_WITH_LIMITATIONS`. Builder v7.4, GitHub Prepare Validator SHA-256 `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef`, and Tester v3.4.2 form the supported workflow. The new Validator has passed its local Prepare gates, the PR CI (historical private reference), and merge-commit CI (historical private reference). A separate immutable snapshot ref `release/casual-private-beta-v0.2-2026-11-01` is created after final documentation CI; **do not confuse it with the frozen original beta**. Stable/public release: NOT APPROVED. AIO, Forge, Commander, and Power Level remain excluded experiments.
+**Private history:** Casual Private Beta v0.2 was approved for scoped private use with `PASS_WITH_LIMITATIONS`. The following sections preserve that decision and its rollback context. The [private release record](docs/releases/CASUAL_PRIVATE_BETA_v0.2_2026-11-01.md) applies to the historical private source. [ChatGPT Project v1.6](docs/CHATGPT_PROJECT_PRIVATE_BETA_SETUP.md) is a separate environment.
 
 ## Read this first
 
@@ -19,9 +16,9 @@
 | **Prompt version archive** | [Prompt index](prompts/README.md) | GitHub and ChatGPT Project files do not automatically synchronize |
 | **ChatGPT Project setup and copy-paste instruction** | [Active private-beta Project setup](docs/CHATGPT_PROJECT_PRIVATE_BETA_SETUP.md) | Additive override; preserve masterprompts and rollback |
 
-## Current code and verified component selection
+## Historical private-beta code and component selection
 
-The original frozen private-beta branch remains unchanged (2026-10-22 checkpoint). Following approved PR #27, GitHub `main` uses Prepare Validator v1.1.1 with an additional **one-line docstring usage correction** in the v0.2 candidate; new SHA-256 `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef`. The corrected source has the same functional code as the earlier Project Prepare candidate `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d`. The existing ChatGPT Project v1.6 remains pinned to that earlier candidate until separately updated; GitHub and Project Sources do not synchronize. The frozen beta and both Project rollback versions remain unchanged.
+The original frozen private-beta branch remains unchanged (2026-10-22 checkpoint). Following approved PR #27, the private GitHub `main` used Prepare Validator v1.1.1 with an additional **one-line docstring usage correction** in the v0.2 candidate; new SHA-256 `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef`. The corrected source has the same functional code as the earlier Project Prepare candidate `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d`. The existing ChatGPT Project v1.6 remains pinned to that earlier candidate until separately updated; GitHub and Project Sources do not synchronize. The frozen beta and both Project rollback versions remain unchanged.
 
 | Role | Pinned version / identity | Notes |
 |---|---|---|
@@ -30,8 +27,8 @@ The original frozen private-beta branch remains unchanged (2026-10-22 checkpoint
 | Builder | `prompts/casual/builder/stable/MTG_Deck_Builder_v7.4_full.md` | Stable Builder v7.4, not the experimental v7.4.1 |
 | Tester | `prompts/casual/tester/MTG_Deck_Tester_v3.4.2_full.md` | Masterprompt; not a standalone Python simulator |
 | **Frozen-beta Validator (release branch ONLY)** | `validator/MTG_Deck_Validator_v1.1.1.py` on `release/casual-private-beta-2026-10-22` | SHA-256 `8749b50d0aeaa52124a99271a0ab40bcc979350c6e8b5e9074c4f28d63a3d1ac`; previous Project beta rollback is identical; **not** the `main` implementation |
-| **Active ChatGPT Project Validator** | Project Source `MTG_Deck_Validator_v1.1.1_PREPARE_COLOR_INTEGRITY_CANDIDATE.py` | SHA-256 `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d`; activation confirmed 2026-10-31; byte-identical to the code now on GitHub `main`, but a separately managed Project file |
-| **GitHub `main` Validator, Private Beta v0.2 ACTIVE** | `validator/MTG_Deck_Validator_v1.1.1.py` | SHA-256 `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef`; only the historical CLI usage example changed since PR #27. Full PR #29 CI and merge CI `SUCCESS`. Independent Project v1.6 still selects previous Prepare SHA `c4222956…` until explicit Project migration. |
+| **Active ChatGPT Project Validator** | Project Source `MTG_Deck_Validator_v1.1.1_PREPARE_COLOR_INTEGRITY_CANDIDATE.py` | SHA-256 `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d`; activation confirmed 2026-10-31; behaviorally equivalent to the private v0.2 Validator at the time, with a distinct hash and separately managed file |
+| **Historical private GitHub `main` Validator, Private Beta v0.2** | `validator/MTG_Deck_Validator_v1.1.1.py` | SHA-256 `f8e915a95e73e20edf59267dfe39e45f82d62bb5eb49fd4eb180194189d995ef`; only the historical CLI usage example changed since PR #27. Full PR #29 CI and merge CI `SUCCESS`. Independent Project v1.6 still selects previous Prepare SHA `c4222956…` until explicit Project migration. |
 | **Previous ChatGPT Project beta — rollback ONLY** | `MTG_Deck_Validator_v1.1.1_BETA_CANDIDATE.py` | SHA-256 `8749b50d0aeaa52124a99271a0ab40bcc979350c6e8b5e9074c4f28d63a3d1ac`; preserve locally as rollback |
 | **Historical Project rollback ONLY** | Separate original Project file `MTG_Deck_Validator_v1.1.1.py` | SHA-256 `0d296f69a465bdaf5d967d2155460bbe69bb3d653f58952468d45713d2f9db8e`; **not** the same as the current GitHub file named v1.1.1 |
 | Auxiliary tools | `tools/card_search.py`, `tools/synergy_engine.py`, `tools/combo_synergy_report.py` | Verify current-chat executability; never pretend they ran |
@@ -68,7 +65,7 @@ The activated [v0.2 release definition](docs/releases/CASUAL_PRIVATE_BETA_v0.2_2
 
 ## Experimental Gateway and publication status
 
-The Gateway is available on `main` from `04124cd7`. Its three CLI actions passed synthetic checks with the default Validator. Alternate profiles and cross-agent portability remain outside that evidence. Forge Lite remains experimental. Swap Advisor is separate and on hold.
+The original Gateway was introduced in the private source at `04124cd7`. Its three CLI actions passed synthetic checks with the then-default Validator. Alternate profiles and cross-agent portability remain outside that evidence. Forge Lite remains experimental. Swap Advisor is separate and on hold.
 
 **Public source preview: PUBLIC_TEST_PREVIEW** (2026-11-06). Source is public for independent testing; original private beta acceptance and standalone strategic gates are unchanged. See [PUBLIC_TESTING.md](PUBLIC_TESTING.md) and the [publication checklist](docs/PUBLIC_RELEASE_CHECKLIST.md).
 

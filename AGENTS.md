@@ -2,14 +2,14 @@
 
 **Purpose:** Help Python-capable AI agents build and evaluate Casual 60+ card decks using the existing AI Deckbuilding Tool workflow. AI reasoning is required by the intended host product; Python tools constrain factual claims. This file is an **onboarding map**, not a replacement for stable Builder/Tester prompts, the Validator, official rules, or approval gates.
 
-**Current scope (2026-11-05):** Casual private beta v0.2 (PASS_WITH_LIMITATIONS). Stable Builder v7.4 and Tester v3.4.2 are prompts, **not autonomous Python programs**. Swap Advisor work remains separate and on hold. MTG-AIO is a separate future, non-AI project.
+**Current public scope:** `PUBLIC_TEST_PREVIEW` for the Casual workflow. Private beta v0.2 acceptance is historical. Stable Builder v7.4 and Tester v3.4.2 are prompts, **not autonomous Python programs**. Swap Advisor work remains separate and on hold. MTG-AIO is a separate future, non-AI project.
 
 ## A new agent must follow this order
 
 1. **Check capabilities.** Confirm Python and actual access to local scripts, card data, active collection, and output folder. An attachment, Project Source, link or GitHub file is not proof of executable runtime access. Label an unrun step `NOT_EXECUTED`.
 2. **Establish the correct sources.** Check the actual Oracle and applicable Validator file hashes in the runtime. Record the selected environment/version and full SHA-256. Never assume the same filename means the same bytes. MTGJSON/Oracle establishes card facts, **never ownership**.
 3. **Confirm collection for this run.** Only a collection explicitly provided/confirmed for the current execution permits owned-card claims. Never reuse ownership from chat memory, earlier exports or repository examples. No real collection: request authorization or use a visibly **synthetic** example.
-4. **Read the active specification.** For Casual deck construction use `prompts/casual/builder/stable/MTG_Deck_Builder_v7.4_full.md`; follow its constraints on requested strategy, colors, card counts, independent vs simultaneously assembled decks, and Basic-land policy. Read `PROJECT_STATUS.md` for the active beta boundary.
+4. **Read the active specification.** For Casual deck construction use `prompts/casual/builder/stable/MTG_Deck_Builder_v7.4_full.md`; follow its constraints on requested strategy, colors, card counts, independent vs simultaneously assembled decks, and Basic-land policy. Read `PROJECT_STATUS.md` for the preview boundary.
 5. **Discover candidates, not conclusions.** Use `tools/card_search.py`, `tools/synergy_engine.py` or `tools/combo_synergy_report.py` as appropriate. Their recognized roles and synergy pairs are **heuristics**, not complete MTG rules verification or proof of strength.
 6. **Build and validate.** AI selects a coherent whole-deck strategy and produces complete lists. Run the applicable pinned Validator on each final Casual deck and inspect exit code, status, failures, uncertainties, mana curve and Prepare/face audits. Failed, ambiguous or unsupported validation blocks any claim of a validated deck.
 7. **Interpret limits accurately.** Tester v3.4.2 can analyze a frozen deck if requested, but is a **prompt-based analytical tester**, not an executed game engine. Only report genuinely executed numeric analyses. Forge Lite is optional external evidence, not a source of universal win rates.
@@ -20,7 +20,7 @@
 
 | Need | Maintained entry | Meaning |
 | --- | --- | --- |
-| Status and versions | `PROJECT_STATUS.md` | Current selected private-beta workflow |
+| Status and versions | `PROJECT_STATUS.md` | Current public preview and historical workflow records |
 | Minimal commands | `docs/AGENT_QUICKSTART.md` | Human- and agent-readable start |
 | Stable Casual Builder | `prompts/casual/builder/stable/MTG_Deck_Builder_v7.4_full.md` | AI deck-construction instructions |
 | Card shortlist | `tools/card_search.py` | Oracle-backed search and heuristic roles |
@@ -39,5 +39,5 @@
 - Do not silently modify the Builder, Tester, Validator, accepted `main`, releases, frozen history, Commander, Forge Lite or MTG-AIO. Work on isolated experimental branches and use review.
 - Use English for all project content and agent outputs. Preserve official English card names and technical identifiers.
 
-**Gateway status:** The experimental CLI has passed independent synthetic acceptance. Portability across agents remains untested. Adding this file to GitHub does not install it as a ChatGPT Project Source or grant Python or file access.
+**Gateway status:** See the [verification record](docs/PUBLIC_PREVIEW_AUDIT.md) for synthetic execution evidence. Portability across agents remains untested. Adding this file to GitHub does not install it as a ChatGPT Project Source or grant Python or file access.
 

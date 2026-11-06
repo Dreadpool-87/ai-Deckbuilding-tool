@@ -35,7 +35,7 @@ Pair suggestions sort **repeatable nonland sources first**, then other nonland c
 
 The audit of a *private* collection remains local: no user's inventory, filenames, card lists, generated pairs or execution artifacts should be committed to the repository. New synthetic tests, not the user's collection, are suitable for GitHub CI.
 
-Version 0.2 default searches for other themes remain unchanged; generic interaction is opt-in for those themes through --role interaction. The existing deck validator, Commander Spellbook checker and Forge remain separate.
+Generic interaction is opt-in for themes other than Lifegain through `--role interaction`. The existing deck validator, Commander Spellbook checker and Forge remain separate.
 
 ### Original implementation and licensing
 
@@ -101,6 +101,20 @@ python card_search.py --oracle AtomicCards_slim_v2.json.gz \
 
 **Important distinction:** every topic can be searched for *explicit Oracle text mentions*; indirect, wordless synergy requires mechanic-specific patterns or Builder reasoning. The included v0.2 heuristic library covers selected Deathtouch, Lifelink, Landfall, Proliferate, Sacrifice, Treasure, Tokens and +1/+1-counter interactions. It **does not discover every possible interaction** and does not establish that cards can legally perform a combo.
 
+## Creature subtype and Oracle-text evidence
+
+A theme such as `--theme "Elf tribal"` considers a creature with the exact MTGJSON `subtypes` entry `Elf` even when its Oracle text omits the word. A card with Oracle text mentioning Elf or Elves can also match without having that subtype. Each result's `theme_match_basis` separates consistent `CREATURE_SUBTYPE` and `ORACLE_TEXT` matches across records. A subtype match alone gives a heuristic core role and says nothing about strategic strength.
+
+Role evidence may identify a `DIRECT_SYNERGY_CANDIDATE` where a recognized interaction or explicit reference links the role to the requested theme. This still requires rules review. `HEURISTIC_STRATEGY` covers broader role patterns. An Oracle-text mention on its own provides evidence of wording only.
+
+## Names and collection input
+
+Ordinary `--name` queries support case-insensitive substring discovery. A combined AtomicCards name such as `Wear // Tear` can be selected by the full name with optional spacing around `//` or by an exact face name corroborated by `faceName` on a matching canonical record. This applies to split, flip, modal double-faced, transform, Adventure and Prepare layouts with consistent metadata. A slim record can omit layout or side if the canonical name and explicit face name agree. A face query selects the whole card entry. Other filters still use the existing conservative agreement across its records.
+
+The same exact identity lookup applies to collection rows. A spelling resemblance, delimiter component without corroborating metadata, or unsupported meld face supplies no owned copies. Shared face names, competing canonical name claims and contradictory face metadata are reported as `UNVERIFIED`. Inspect `name_identity` for exact name queries and `collection_coverage` for unmatched and unverified CSV names. Duplicate keys anywhere in the Oracle JSON abort loading. A slim snapshot can only check uniqueness within its own records. Use full canonical names and a trusted complete snapshot when a short name could be ambiguous outside that snapshot.
+
+Collection CSVs require unique headers including `Name` and `Quantity`, a consistent number of fields, a nonempty name and a nonnegative integer quantity on every data row. Blank physical lines are allowed. Malformed rows abort discovery with the start line and cause. Repeated resolved rows add their quantities, so list each owned copy only once even if a card has multiple face names.
+
 ## Search types and evidence semantics
 
 | Filter | Meaning |
@@ -117,11 +131,11 @@ python card_search.py --oracle AtomicCards_slim_v2.json.gz \
 | `--limit N --offset N` | Sort and paginate results (default 50, maximum **500 per page**); `total_matches` is not truncated |
 | `--format json --output FILE` | Machine-readable candidates for the ChatGPT Builder; JSON contains exact text evidence |
 
-Every role evidence object has `role`, `reason`, `evidence`, `confidence` (`HIGH` or `HEURISTIC`) and `conditional`. A card may have **multiple roles**, and confidence does not certify a comprehensive rules analysis. Uncertain multi-printing or malformed data are conservatively flagged or excluded.
+Every role evidence object has `role`, `reason`, `evidence`, `confidence` (`HIGH` or `HEURISTIC`), `conditional` and `basis`. A card may have **multiple roles**, and confidence does not certify a comprehensive rules analysis. Uncertain multi-printing or malformed data are conservatively flagged or excluded.
 
 ### What the roles mean
 
-- **CORE:** the requested ability/mechanic appears on the card itself. A self-activated ability may be labeled conditional CORE, not unconditional CORE.
+- **CORE:** the requested ability, mechanic or creature subtype appears on the card itself. A self-activated ability may be labeled conditional CORE, not unconditional CORE.
 - **ENABLER:** a card can grant/enable the mechanic. Conditions such as tribal restrictions or temporary duration must be inspected by the Builder.
 - **PAYOFF:** a triggered or conditional effect explicitly benefits from the theme, such as Hooded Blightfang's Deathtouch-dependent attacks. Merely having the ability and an unrelated trigger is **not** a payoff.
 - **SYNERGY:** a suggested interaction. A Deathtouch creature plus a Rabid Bite-style effect is one example; Oracle/rules verification is required.
@@ -158,4 +172,4 @@ python -m unittest discover -s tests -p "test_*.py" -v
 python -m unittest -v tests/test_card_search_roles_v0_2.py
 ```
 
-The repository's CI should run both existing and newly added regression tests across Python 3.9, 3.12 and 3.13. The new classifier needs its own real-data smoketest with the slim MTGJSON and CSV; private sample outputs belong in the user's chat, not the repository.
+The repository's test workflow runs regressions on Python 3.12 and 3.13. The new classifier needs its own real-data smoketest with the slim MTGJSON and CSV; private sample outputs belong in the user's chat, not the repository.
