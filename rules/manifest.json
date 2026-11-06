@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "status": "verified",
+  "last_checked_utc": "2026-10-14 17:44 UTC",
+  "sources": {
+    "comprehensive_rules": {
+      "url": "https://magic.wizards.com/en/rules",
+      "sha256": "4610699912591d103e38aafe2ef9e600e64a192e03cfaedc4a82749ff0af9db4",
+      "bytes": 150813
+    },
+    "comprehensive_rules_docx": {
+      "url": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.docx",
+      "sha256": "201037368d45407f271733a0575b756b3a868ce5e8024cf24aa1f30d48ecb960",
+      "bytes": 712249
+    },
+    "comprehensive_rules_pdf": {
+      "url": "https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.pdf",
+      "sha256": "674241213075cd581dd3255567ebeec7b40ffae3a27c6a3bd99218af6b2b6659",
+      "bytes": 2527259
+    },
+    "commander_format": {
+      "url": "https://magic.wizards.com/en/formats/commander",
+      "sha256": "e63eafc7fcbefc77f4b2d165a651ececc4db19baa3dfb0dc56a6d06c6d2e261e",
+      "bytes": 427685
+    },
+    "banned_restricted": {
+      "url": "https://magic.wizards.com/en/banned-restricted-list",
+      "sha256": "def38a80a72f7da25d7a0c13ba82bfa2e0b4139f2954f9cf02d1d7cbf134d938",
+      "bytes": 222747
+    }
+  },
+  "notice": "Checksums detect source changes, not confirmed changes to MTG rules or bans."
+}

@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mtg-deck-tools:agent-gateway-result:1",
+  "title": "AI Deckbuilding Tool Agent Gateway Result v1",
+  "description": "Read-only display contract. Never accepted as provenance or validation input. One authoritative gateway status. Existing P2 fields are additive legacy projections.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "gateway_version",
+    "action",
+    "status",
+    "executed",
+    "tool_execution",
+    "sources",
+    "evidence",
+    "reason_codes",
+    "uncertainties",
+    "limitations",
+    "automatic_swap_authorized",
+    "strategic_improvement_verified"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "gateway_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "enum": [
+        "doctor",
+        "discover",
+        "validate",
+        "UNKNOWN"
+      ]
+    },
+    "status": {
+      "enum": [
+        "RUNTIME_COMPONENTS_PRESENT",
+        "CANDIDATES_NOT_VALIDATED",
+        "VALIDATED_WITH_LIMITATIONS",
+        "BLOCKED_INVALID_DECK",
+        "UNVERIFIED",
+        "INPUT_ERROR"
+      ]
+    },
+    "executed": {
+      "type": "boolean",
+      "description": "Whether an actual downstream child tool was started; doctor is not child execution."
+    },
+    "tool_execution": {
+      "enum": [
+        "NOT_EXECUTED",
+        "EXECUTED",
+        "FAILED_AFTER_START"
+      ]
+    },
+    "sources": {
+      "type": "object",
+      "required": [
+        "oracle_sha256",
+        "validator_sha256",
+        "validator_profile",
+        "collection_sha256",
+        "deck_sha256",
+        "collection_scope",
+        "ownership_authentication"
+      ],
+      "properties": {
+        "oracle_sha256": {
+          "$ref": "#/$defs/hashOrNull"
+        },
+        "validator_sha256": {
+          "$ref": "#/$defs/hashOrNull"
+        },
+        "collection_sha256": {
+          "$ref": "#/$defs/hashOrNull"
+        },
+        "deck_sha256": {
+          "$ref": "#/$defs/hashOrNull"
+        },
+        "collection_scope": {
+          "enum": [
+            "synthetic",
+            "current-run-confirmed",
+            null
+          ]
+        },
+        "ownership_authentication": {
+          "enum": [
+            "NOT_CHECKED",
+            "NOT_IMPLEMENTED"
+          ]
+        },
+        "validator_profile": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "github-main-v0.2",
+            "project-prepare-candidate",
+            "frozen-beta-20261022",
+            null
+          ],
+          "description": "Selected pinned Validator profile, or null when no validator was involved; not an independent attestation."
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "facts",
+        "derivations",
+        "hypotheses"
+      ],
+      "properties": {
+        "facts": {
+          "$ref": "#/$defs/evidenceList"
+        },
+        "derivations": {
+          "$ref": "#/$defs/evidenceList"
+        },
+        "hypotheses": {
+          "$ref": "#/$defs/evidenceList"
+        }
+      },
+      "additionalProperties": false
+    },
+    "reason_codes": {
+      "$ref": "#/$defs/stringList"
+    },
+    "uncertainties": {
+      "$ref": "#/$defs/stringList"
+    },
+    "limitations": {
+      "$ref": "#/$defs/stringList"
+    },
+    "automatic_swap_authorized": {
+      "const": false
+    },
+    "strategic_improvement_verified": {
+      "const": false
+    },
+    "reason": {
+      "type": "string",
+      "description": "Legacy P2 error reason, not a second authoritative status"
+    },
+    "result": {
+      "type": "object",
+      "description": "Original child-tool JSON after path sanitization; its nested status is the child Validator status, not a second gateway verdict"
+    },
+    "checks": {
+      "type": "object",
+      "description": "Original doctor local checks. Readiness of files is not executed deck validation."
+    }
+  },
+  "$defs": {
+    "hashOrNull": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidenceList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "basis",
+          "scope"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "basis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "stringList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "doctor"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "executed": {
+            "const": false
+          },
+          "tool_execution": {
+            "const": "NOT_EXECUTED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "executed": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tool_execution": {
+            "const": "NOT_EXECUTED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "executed": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "tool_execution": {
+            "enum": [
+              "EXECUTED",
+              "FAILED_AFTER_START"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "INPUT_ERROR"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "executed": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "BLOCKED_INVALID_DECK",
+              "VALIDATED_WITH_LIMITATIONS"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "action": {
+            "const": "validate"
+          },
+          "executed": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "CANDIDATES_NOT_VALIDATED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "action": {
+            "const": "discover"
+          },
+          "executed": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tool_execution": {
+            "const": "FAILED_AFTER_START"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "UNVERIFIED"
+          },
+          "executed": {
+            "const": true
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": true
+}

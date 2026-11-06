@@ -1,0 +1,104 @@
+# Agent Gateway Result Contract v1 (experimental)
+
+**Status:** Experimental output contract, exercised in independent synthetic acceptance. Python standard library only. Consumers should use the observed execution result as evidence.
+
+## Consumer rule: one authoritative gateway status
+
+The JSON returned by `python tools/agent_gateway.py doctor|discover|validate` contains the following required fields:
+
+| Field | Meaning |
+| --- | --- |
+| `schema_version: 1` | Version of this common output contract, independent of tool/Validator versions |
+| `gateway_version` | Versioned implementation that emitted this report |
+| `action`, `status` | Requested supported action and **one authoritative gateway result** |
+| `executed` | **True only if an actual downstream child script was started**; local `doctor` checks are not child execution |
+| `tool_execution` | `NOT_EXECUTED`, `EXECUTED`, or `FAILED_AFTER_START` |
+| `sources` | Observed file hashes (when available), explicitly selected Validator profile, collection declaration and authentication boundary |
+| `evidence.facts` | Narrow facts such as local SHA-256 bytes matching a supplied expectation, **not card-rule correctness** |
+| `evidence.derivations` | Executed, bounded mechanical/structural deductions, with a named scope |
+| `evidence.hypotheses` | Heuristic card-theme/role ideas, **never rules/strategic proof** |
+| `reason_codes` | Machine-readable failure or abstention cause codes |
+| `uncertainties`, `limitations` | Explicit unknowns and unsupported claims |
+| `automatic_swap_authorized: false` | No automatic deck changes |
+| `strategic_improvement_verified: false` | No superior-deck claim |
+
+The full machine-readable schema is [`schemas/agent_gateway_result_v1.schema.json`](../schemas/agent_gateway_result_v1.schema.json). It uses JSON Schema Draft 2020-12; runtime schema validation is not an installed dependency. Existing P2 `checks`, `result`, `reason` and selected provenance keys remain for compatibility. **Do not treat `result.status` as a second gateway verdict.** It is the original underlying tool's status (for example, the Validator's `PASS_WITH_LIMITATIONS`). The top-level `status` is the gateway authority.
+
+## Outcomes and exit codes
+
+| Action | Gateway status | Meaning | Exit |
+| --- | --- | --- | --- |
+| doctor | `RUNTIME_COMPONENTS_PRESENT` | Readable scripts; expected local Validator hash matched; **no deck test** | 0 |
+| doctor | `UNVERIFIED` | One or more required local components not established | 3 |
+| discover | `CANDIDATES_NOT_VALIDATED` | Card Search script executed and emitted candidate data; no deck/strategy proof | 0 |
+| validate | `VALIDATED_WITH_LIMITATIONS` | Existing Casual Validator reported structural `PASS_WITH_LIMITATIONS` with matching exit | 0 |
+| validate | `BLOCKED_INVALID_DECK` | Existing Validator reported `FAIL`; blocked from positive deck conclusions | 2 |
+| validate | `UNVERIFIED` | Existing Validator could not establish full scoped validation | 3 |
+| any | `INPUT_ERROR` | Bad/missing/unsafe inputs or failed preconditions; child not started | 2 |
+| downstream failure | `UNVERIFIED` | Child started but timed out or returned unusable/contradictory output; no trusted result | 3 |
+
+`--help` prints ordinary human-readable argparse help. Invalid CLI arguments, however, produce a structured JSON `INPUT_ERROR` with `INVALID_ARGUMENTS`, without echoing user-provided paths.
+
+## P4 compatible source identity extension
+
+The v1 contract now requires `sources.validator_profile`, one of `github-main-v0.2`, `project-prepare-candidate`, `frozen-beta-20261022` or null when not selected. A **profile is only a declared selection**; it is not proof of local execution. The gateway compares the selected local Validator bytes against the corresponding fixed SHA-256 and rejects mismatches. See [P4 compatibility details](AGENT_SOURCE_COMPATIBILITY_P4.md). No alternate-runtime GO is implied.
+
+## P4 Validator profile identity
+
+The v1 schema now includes `sources.validator_profile`: the explicitly selected `github-main-v0.2`, `project-prepare-candidate` or `frozen-beta-20261022` profile, or null for actions without a selected Validator. A profile is **not** independent proof of source authenticity; the runtime must hash the selected local bytes, then fail closed on mismatches. See [P4 Source Compatibility](AGENT_SOURCE_COMPATIBILITY_P4.md).
+
+## Pinned execution and input snapshots
+
+The Gateway pins Card Search code (`doctor.checks.card_search.pin_matches`) and executes SHA-checked, staged code bytes. The underlying tool reads staged snapshots of the declared Oracle and collection, and additionally the deck for validation. `sources.*_sha256` correspond to those captured snapshots, not authenticated ownership. A change of the original files detected after execution still invalidates the result with `UNVERIFIED`. This work does not change `schema_version`, permitted statuses, successful exitcodes or the nested child-result meaning.
+
+## Sources and evidence
+
+- `sources.oracle_sha256`: observed local bytes matching `--oracle-sha256`. A **synthetic** run may supply its own fixture hash; this does **not** authorize real-user operation. Real collection mode requires the frozen slim Oracle pin.
+- `sources.validator_sha256`: the observed local source hash from `doctor`, or the explicitly pinned GitHub-main Validator during validation. This is **not** a claim of general rules-engine completeness.
+- `sources.collection_sha256`, `sources.deck_sha256`: observed fingerprints of the inputs staged for the tool. They do not authenticate ownership or establish an atomic multi-file handoff.
+- `sources.collection_scope`: `synthetic`, `current-run-confirmed` or null for `doctor`. The flag `--collection-confirmed` is a caller declaration only; `ownership_authentication` remains `NOT_IMPLEMENTED`.
+- `evidence` entries contain only `code`, `basis` and `scope`. Their presence does not override `uncertainties`; an AI agent must not promote a role guess to `FACT`.
+- No user collection, deck, path, private Oracle dump, or hidden test data may be committed to GitHub. Tool JSON output can include private deck/card data when run locally and **must not be forwarded to an external AI provider without separate authorization**.
+
+## Compact sample (illustrative, not an executed report)
+
+```json
+{
+  "schema_version": 1,
+  "gateway_version": "0.2.0-experimental",
+  "action": "discover",
+  "status": "CANDIDATES_NOT_VALIDATED",
+  "executed": true,
+  "tool_execution": "EXECUTED",
+  "sources": {
+    "oracle_sha256": null,
+    "validator_sha256": null,
+    "collection_sha256": null,
+    "deck_sha256": null,
+    "collection_scope": "synthetic",
+    "ownership_authentication": "NOT_IMPLEMENTED"
+  },
+  "evidence": {
+    "facts": [],
+    "derivations": [],
+    "hypotheses": [
+      {"code": "DISCOVERED_CARD_ROLES", "basis": "CARD_SEARCH_V0_3", "scope": "HEURISTIC_NOT_RULES_VERIFIED"}
+    ]
+  },
+  "reason_codes": [],
+  "uncertainties": ["CANDIDATES_NOT_DECK_VALIDATED", "STRATEGIC_IMPROVEMENT_UNVERIFIED"],
+  "limitations": ["An illustrative output shape, not a source of card truth."],
+  "automatic_swap_authorized": false,
+  "strategic_improvement_verified": false
+}
+```
+
+The above example uses null hashes deliberately; real successful `discover` output has actual hashes derived from read files. The full P2 child `result` is omitted for readability. Do not submit this sample to the system as evidence.
+
+## Hard consumer safeguards
+
+1. Respect `status` and `tool_execution` together. A tool crash or invalid JSON is `UNVERIFIED`, never success, and `FAILED_AFTER_START` means no trusted child result.
+2. `VALIDATED_WITH_LIMITATIONS` is **not** verified strategy, complete legality, castability, combo viability or win probability.
+3. Card Search results are **candidates only**. They cannot establish ownership beyond the currently declared collection.
+4. The output may be shown or archived locally but is not a reusable proof input. Never accept a cached report or AI-written claim as new source data.
+5. This output contract covers the Gateway actions. Cross-agent evaluation and any Builder or Swap Advisor integration have separate scopes.

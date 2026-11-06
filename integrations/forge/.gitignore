@@ -1,0 +1,7 @@
+# Keep downloaded/unpacked third-party Forge runtime out of Git history.
+*.jar
+*.tar.bz2
+runtime/
+downloads/
+logs/
+*.log

@@ -1,0 +1,171 @@
+name: Private MTGJSON verified bundle (draft only)
+
+on:
+  schedule:
+    # Monthly, after the existing read-only upstream verification.
+    - cron: "37 7 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mtgjson-private-draft-bundle
+  cancel-in-progress: false
+
+jobs:
+  private-draft-snapshot:
+    if: github.event.repository.private == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Hard-stop unless repository is private
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private')" = "true" || {
+            echo "Repository is not private; refusing to mirror third-party data" >&2
+            exit 1
+          }
+
+      - name: Download and verify four official datasets and checksums
+        run: |
+          set -euo pipefail
+          python scripts/prepare_mtgjson_private_bundle.py --output-dir "$RUNNER_TEMP/mtgjson-private-bundle"
+
+      - name: Stage rights notices and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mtgjson-private-bundle"
+          cp third_party_licenses/MTGJSON-MIT.txt "$out/MTGJSON-MIT.txt"
+          cp THIRD_PARTY_NOTICES.md "$out/THIRD_PARTY_NOTICES.md"
+          cat > "$out/RELEASE_NOTES.md" <<'EOF'
+          Verified upstream MTGJSON data snapshot, **private DRAFT** for controlled personal backup.
+
+          All four `.gz` files and their corresponding `.gz.sha256` files were downloaded
+          from official MTGJSON endpoints and their SHA-256 digests checked before staging.
+          See `manifest.json` for sizes, versions, record counts and source URLs.
+
+          MTGJSON: Copyright © 2018 – Present, Zach Halpern and contributors, MIT license.
+          MTGJSON's license does not independently license Wizards of the Coast content.
+          Magic: The Gathering and related card content belong to their respective owners.
+          This archive must not be published or made public without a separate rights review.
+          EOF
+
+      - name: Create immutable private draft Release, never publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private')" = "true"
+          out="$RUNNER_TEMP/mtgjson-private-bundle"
+          tag="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag"])' "$out/manifest.json")"
+          files=(
+            "$out/AtomicCards.json.gz" "$out/AtomicCards.json.gz.sha256"
+            "$out/cards.csv.gz" "$out/cards.csv.gz.sha256"
+            "$out/cardIdentifiers.csv.gz" "$out/cardIdentifiers.csv.gz.sha256"
+            "$out/cardRulings.csv.gz" "$out/cardRulings.csv.gz.sha256"
+            "$out/manifest.json" "$out/MTGJSON-MIT.txt" "$out/THIRD_PARTY_NOTICES.md"
+          )
+          for file in "${files[@]}"; do test -s "$file"; done
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            draft="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')"
+            test "$draft" = "true" || {
+              echo "Existing tag is not a draft; aborting" >&2
+              exit 1
+            }
+            mkdir -p "$RUNNER_TEMP/prior-manifest"
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern manifest.json --dir "$RUNNER_TEMP/prior-manifest"
+            cmp "$out/manifest.json" "$RUNNER_TEMP/prior-manifest/manifest.json" || {
+              echo "Existing version has different checksums: manual investigation required" >&2
+              exit 1
+            }
+            echo "Existing draft matches verified manifest; no changes made."
+          else
+            gh release create "$tag" "${files[@]}" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --draft --title "PRIVATE MTGJSON verified bundle $tag" \
+              --notes-file "$out/RELEASE_NOTES.md"
+          fi
+          {
+            echo "## Private MTGJSON snapshot"
+            echo "Tag: $tag"
+            echo "Four data archives + four official SHA-256 checksums"
+            echo "Status: private DRAFT only; never published automatically"
+            echo "No card datasets committed to Git history"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify remote draft byte-for-byte and retain newest two only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private')" = "true"
+          out="$RUNNER_TEMP/mtgjson-private-bundle"
+          tag="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag"])' "$out/manifest.json")"
+          remote="$RUNNER_TEMP/mtgjson-release-verified"
+          mkdir -p "$remote"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir "$remote"
+          for file in \
+            AtomicCards.json.gz AtomicCards.json.gz.sha256 \
+            cards.csv.gz cards.csv.gz.sha256 \
+            cardIdentifiers.csv.gz cardIdentifiers.csv.gz.sha256 \
+            cardRulings.csv.gz cardRulings.csv.gz.sha256 \
+            manifest.json MTGJSON-MIT.txt THIRD_PARTY_NOTICES.md; do
+            cmp -s "$out/$file" "$remote/$file" || {
+              echo "Remote Release asset missing or differs: $file; no cleanup" >&2
+              exit 1
+            }
+          done
+          echo "All 11 remote Release assets match verified local staging."
+
+          inventory="$RUNNER_TEMP/mtgjson-private-releases.json"
+          plan="$RUNNER_TEMP/mtgjson-private-retention-plan.json"
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$inventory"
+          python scripts/plan_mtgjson_private_retention.py \
+            --current-tag "$tag" --releases "$inventory" --output "$plan"
+          echo "Retention plan:"
+          jq '{current, keep: [.keep[].tag], older: [.older[].tag]}' "$plan"
+          count="$(jq '.older | length' "$plan")"
+          if [ "$count" -eq 0 ]; then
+            echo "At most two complete private drafts exist; no deletion."
+            exit 0
+          fi
+
+          # Recheck inventory to catch other jobs or manual changes.
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/mtgjson-releases-recheck.json"
+          python scripts/plan_mtgjson_private_retention.py \
+            --current-tag "$tag" \
+            --releases "$RUNNER_TEMP/mtgjson-releases-recheck.json" --recheck "$plan"
+
+          # Delete ONLY old draft Releases using exact validated IDs/tags.
+          # Historical mtgjson-atomic-* and all other GitHub Releases are excluded.
+          while IFS=$'\t' read -r release_id release_tag; do
+            test "$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private')" = "true"
+            [[ "$release_tag" == mtgjson-private-bundle-* ]] || exit 1
+            actual="$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --jq '.tag_name')"
+            draft="$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --jq '.draft')"
+            if [ "$actual" != "$release_tag" ] || [ "$draft" != "true" ]; then
+              echo "Old Release changed during cleanup; refusing to delete." >&2
+              exit 1
+            fi
+            echo "Deleting verified old private DRAFT: $release_tag (ID $release_id)"
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/$release_id" >/dev/null
+          done < <(jq -r '.older[] | [.id, .tag] | @tsv' "$plan")
+
+          {
+            echo "## Private MTGJSON retention"
+            echo "Kept two newest complete draft Release snapshots."
+            echo "Deleted $count older draft snapshots (managed tag prefix only)."
+            echo "Historical AtomicCards Release preserved."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -218,3 +218,30 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AI Deckbuilding Tool: never accidentally stage personal collection exports.
+/collecties/
+/collections/
+/collection/
+/data/
+/mtgjson-build/
+*collectie*.csv
+*Collectie*.csv
+*collection*.csv
+*Collection*.csv
+*.csv
+*.tsv
+AtomicCards*.json
+AtomicCards*.json.gz
+*.sqlite
+*.db
+rapport*.json
+report*.json
+
+# Local credentials and secrets
+.env.*
+*.pem
+*.key
+
+# Keep generated gameplay data and local mirrors out of the repository.
+/forge-poc-output/

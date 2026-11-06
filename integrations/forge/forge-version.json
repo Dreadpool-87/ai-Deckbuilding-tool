@@ -1,0 +1,10 @@
+{
+  "upstream_project": "Card-Forge/forge",
+  "upstream_release_tag": "forge-2.0.15",
+  "archive_name": "forge-installer-2.0.15.tar.bz2",
+  "download_url": "https://github.com/Card-Forge/forge/releases/download/forge-2.0.15/forge-installer-2.0.15.tar.bz2",
+  "sha256": "4468f182b60f6ca62d89697baa208981085af744f116781af751c611826db600",
+  "size_bytes": 297081149,
+  "source_code_url": "https://github.com/Card-Forge/forge/tree/forge-2.0.15",
+  "license": "GPL-3.0"
+}

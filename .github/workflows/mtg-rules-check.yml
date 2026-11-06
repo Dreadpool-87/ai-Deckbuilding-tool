@@ -1,0 +1,63 @@
+name: Check official MTG rules sources
+
+on:
+  schedule:
+    - cron: "41 7 1 */2 *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mtg-rules-source-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Inspect official rules sources
+        id: inspect
+        run: python scripts/check_mtg_rules.py
+      - name: Report proposed changes without pushing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- rules/manifest.json rules/CHANGELOG.md; then
+            echo "No rules source changes."
+            echo "No source fingerprint changes detected." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "## Official rules source fingerprints changed"
+            echo "The files were changed only on the temporary runner, not in GitHub."
+            echo "Review these proposed differences and update via a separate PR."
+            echo '~~~diff'
+            git diff -- rules/manifest.json rules/CHANGELOG.md
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "${{ steps.inspect.outputs.change_type }}" == "html_review" ]]; then
+            {
+              echo "### HTML_ONLY_REVIEW_REQUIRED"
+              echo "Only the raw HTML of recognized official source pages changed."
+              echo "The official PDF/DOCX fingerprints and URLs match the verified baseline."
+              echo "This is **not proof that banlists or format rules are unchanged**."
+              echo "Manual review and a separate PR to refresh the recorded baseline are still required."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Official source page HTML changed; manual review required, no automatic baseline update."
+            exit 0
+          fi
+          {
+            echo "### BLOCKING_SOURCE_REVIEW_REQUIRED"
+            echo "Official PDF/DOCX source, source URL, schema or verified baseline changed."
+            echo "Treat this as a blocking monitor failure until reviewed."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::Official MTG rules source documents or integrity metadata changed; manual review required."
+          exit 1

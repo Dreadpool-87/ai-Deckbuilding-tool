@@ -1,0 +1,88 @@
+name: MTG validator and integration regression tests
+
+on:
+  push:
+    paths:
+      - "validator/**"
+      - "scripts/**"
+      - "tools/**"
+      - "tests/**"
+      - "integrations/**"
+      - ".github/workflows/**"
+      - "README.md"
+      - "LICENSE"
+      - "THIRD_PARTY_NOTICES.md"
+      - "third_party_licenses/**"
+      - "docs/**"
+      - "prompts/**"
+      - "examples/**"
+      - "rules/**"
+      - ".gitignore"
+  pull_request:
+    paths:
+      - "validator/**"
+      - "scripts/**"
+      - "tools/**"
+      - "tests/**"
+      - "integrations/**"
+      - ".github/workflows/**"
+      - "README.md"
+      - "LICENSE"
+      - "THIRD_PARTY_NOTICES.md"
+      - "third_party_licenses/**"
+      - "docs/**"
+      - "prompts/**"
+      - "examples/**"
+      - "rules/**"
+      - ".gitignore"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unittest:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12", "3.13"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run complete original and newly added offline regression suite
+        run: python -m unittest discover -s tests -p "test_*.py" -v
+      - name: Run Forge custom deck offline regression tests
+        run: python -m unittest discover -s integrations/forge/tests -p "test_*.py" -v
+      - name: Run isolated Commander Spellbook tests
+        run: python -m unittest discover -s integrations/commander-spellbook/tests -p "test_*.py" -v
+
+  workflow-syntax:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install CI-only YAML syntax parser
+        run: python -m pip install --disable-pip-version-check "PyYAML==6.0.3"
+      - name: Parse all workflows and verify read-only upstream policy
+        run: python scripts/check_workflows.py
+
+  historical-privacy-scan:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Scan reachable historical Git objects and commit messages
+        run: python scripts/audit_public_history.py --repo . --strict

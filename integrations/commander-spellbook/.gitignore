@@ -1,0 +1,8 @@
+# Third-party bulk snapshot and private analyses should never enter Git history
+*.json.gz
+*.json
+*.csv
+*.log
+__pycache__/
+local-data/
+results/

@@ -1,0 +1,46 @@
+name: Verify official Forge runtime (no re-hosting)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-upstream-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout pinned provenance metadata
+        uses: actions/checkout@v6
+
+      - name: Fetch and verify original upstream Forge release
+        shell: bash
+        run: |
+          set -euo pipefail
+          meta=integrations/forge/forge-version.json
+          asset=$(jq -er '.archive_name' "$meta")
+          url=$(jq -er '.download_url' "$meta")
+          expected_sha=$(jq -er '.sha256' "$meta")
+          expected_bytes=$(jq -er '.size_bytes' "$meta")
+          test "$asset" = "forge-installer-2.0.15.tar.bz2"
+          test "$url" = "https://github.com/Card-Forge/forge/releases/download/forge-2.0.15/$asset"
+          test "$expected_sha" = "4468f182b60f6ca62d89697baa208981085af744f116781af751c611826db600"
+          test "$expected_bytes" = "297081149"
+          file="$RUNNER_TEMP/$asset"
+          curl --fail --location --retry 3 --retry-delay 5 --connect-timeout 30 \
+            --max-time 1200 --output "$file" "$url"
+          test "$(stat -c '%s' "$file")" = "$expected_bytes"
+          echo "$expected_sha  $file" | sha256sum --check
+          tar -tjf "$file" > /dev/null
+          {
+            echo "## Forge upstream verification"
+            echo "SOURCE VERIFIED: $url"
+            echo "Archive bytes: $expected_bytes"
+            echo "SHA-256: $expected_sha"
+            echo "No binary was uploaded, committed, or republished by this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"

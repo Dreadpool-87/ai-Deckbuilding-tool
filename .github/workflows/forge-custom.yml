@@ -1,0 +1,151 @@
+name: Forge custom 60-card AI-vs-AI smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      deck_a:
+        description: Repository-relative .txt source for Deck A
+        required: true
+        type: string
+        default: integrations/forge/decks/Synthetic_Green.txt
+      deck_b:
+        description: Repository-relative .txt source for Deck B
+        required: true
+        type: string
+        default: examples/Synthetic_Red_B.txt
+      sha_a:
+        description: Confirmed SHA-256 of Deck A source bytes
+        required: true
+        type: string
+        default: 765ec1e4f4695c0078d12d7d6829ebb7af738e3f05605a6ac087c997c0150f71
+      sha_b:
+        description: Confirmed SHA-256 of Deck B source bytes
+        required: true
+        type: string
+        default: 8d093e197fcd492b83ed24a41c61767d3f500a0d7083072128a36d6c5212f87e
+      seed:
+        description: Explicit Forge RNG seed
+        required: true
+        type: string
+        default: "20261014"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-custom-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      DECK_A: ${{ inputs.deck_a }}
+      DECK_B: ${{ inputs.deck_b }}
+      SHA_A: ${{ inputs.sha_a }}
+      SHA_B: ${{ inputs.sha_b }}
+      RNG_SEED: ${{ inputs.seed }}
+    steps:
+      - name: Checkout exact workflow commit
+        uses: actions/checkout@v6
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Prepare and record provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -version
+          mkdir -p forge-custom-output
+          git rev-parse HEAD | tee forge-custom-output/commit-sha.txt
+          echo "FORGE_DOWNLOAD=${RUNNER_TEMP}/forge-download" >> "$GITHUB_ENV"
+          echo "FORGE_EXTRACTED=${RUNNER_TEMP}/forge-extracted" >> "$GITHUB_ENV"
+          mkdir -p "${RUNNER_TEMP}/forge-download" "${RUNNER_TEMP}/forge-extracted"
+      - name: Validate and convert confirmed decklists
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 integrations/forge/scripts/convert_custom_decks.py \
+            --repo "$GITHUB_WORKSPACE" \
+            --output "$GITHUB_WORKSPACE/forge-custom-output/decks" \
+            --deck-a "$DECK_A" --deck-b "$DECK_B" \
+            --name-a Deck_A --name-b Deck_B \
+            --sha-a "$SHA_A" --sha-b "$SHA_B"
+          cat forge-custom-output/decks/deck-manifest.json
+          (cd forge-custom-output/decks && sha256sum *.dck deck-manifest.json) > forge-custom-output/checksums.sha256
+      - name: Restore verified Forge runtime cache
+        id: forge-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/forge-extracted
+          key: forge-runtime-ubuntu-24.04-${{ hashFiles('integrations/forge/forge-version.json') }}-v1
+      - name: Verify restored Forge runtime
+        if: steps.forge-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=$(jq -er '.sha256' integrations/forge/forge-version.json)
+          test "$(cat "$FORGE_EXTRACTED/.verified-upstream-archive-sha256")" = "$expected"
+          test -n "$(find "$FORGE_EXTRACTED" -type f -name '*.jar' -print -quit)"
+          echo "Verified cached Forge runtime (archive SHA-256: $expected)"
+      - name: Download verified official Forge 2.0.15 archive
+        if: steps.forge-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          meta=integrations/forge/forge-version.json
+          archive=$(jq -er '.archive_name' "$meta")
+          url=$(jq -er '.download_url' "$meta")
+          sha=$(jq -er '.sha256' "$meta")
+          size=$(jq -er '.size_bytes' "$meta")
+          test "$archive" = "forge-installer-2.0.15.tar.bz2"
+          test "$url" = "https://github.com/Card-Forge/forge/releases/download/forge-2.0.15/$archive"
+          curl --fail --location --retry 3 --retry-delay 5 \
+            --connect-timeout 30 --max-time 1200 \
+            --output "$FORGE_DOWNLOAD/$archive" "$url"
+          test "$(stat -c %s "$FORGE_DOWNLOAD/$archive")" = "$size"
+          echo "$sha  $FORGE_DOWNLOAD/$archive" | sha256sum --check
+          tar -tjf "$FORGE_DOWNLOAD/$archive" > /dev/null
+          tar -xjf "$FORGE_DOWNLOAD/$archive" -C "$FORGE_EXTRACTED"
+          test -n "$(find "$FORGE_EXTRACTED" -type f -name '*.jar' -print -quit)"
+          printf "%s\\n" "$sha" > "$FORGE_EXTRACTED/.verified-upstream-archive-sha256"
+      - name: Record pinned Forge version metadata
+        shell: bash
+        run: cp integrations/forge/forge-version.json forge-custom-output/forge-version.json
+      - name: Run exactly one genuine Forge constructed game
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RNG_SEED" =~ ^[0-9]{1,18}$ ]] || { echo "Invalid RNG seed"; exit 2; }
+          python3 integrations/forge/scripts/run_poc.py \
+            --runtime "$FORGE_EXTRACTED" \
+            --decks "$GITHUB_WORKSPACE/forge-custom-output/decks" \
+            --output "$GITHUB_WORKSPACE/forge-custom-output" \
+            --timeout 420 --clock 120 --seed "$RNG_SEED"
+      - name: Honest summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Forge custom 60-card one-game smoke"
+            echo "Requested A: $DECK_A"
+            echo "Requested B: $DECK_B"
+            if [ -f forge-custom-output/result.json ]; then
+              echo '~~~json'
+              cat forge-custom-output/result.json
+              echo '~~~'
+            else
+              echo "BLOCKED: No result.json. Inspect previous steps."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve evidence, never upload Forge binaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-custom-${{ github.run_id }}
+          path: forge-custom-output/
+          retention-days: 7
+          if-no-files-found: warn

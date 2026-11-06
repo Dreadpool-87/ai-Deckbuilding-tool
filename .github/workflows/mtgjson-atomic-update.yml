@@ -1,0 +1,41 @@
+name: Verify upstream MTGJSON AtomicCards (no mirror)
+
+on:
+  schedule:
+    # Monthly: day 1 at 07:17 UTC (manual dispatch is also available).
+    - cron: "17 7 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mtgjson-upstream-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Verify official MTGJSON checksum, metadata and full JSON
+        run: python scripts/update_mtgjson_atomic.py --output-dir "$RUNNER_TEMP/mtgjson-verification"
+
+      - name: Record metadata without republishing the data
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$RUNNER_TEMP/mtgjson-verification/manifest.json"
+          test -s "$manifest"
+          {
+            echo "## Official MTGJSON AtomicCards verification"
+            echo "Version: $(jq -er '.version' "$manifest")"
+            echo "SHA-256: $(jq -er '.sha256' "$manifest")"
+            echo "Source: https://mtgjson.com/api/v5/AtomicCards.json.gz"
+            echo "No dataset was committed, uploaded or republished."
+          } >> "$GITHUB_STEP_SUMMARY"
