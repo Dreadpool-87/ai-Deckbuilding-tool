@@ -12,6 +12,18 @@ Give an AI assistant this repository URL or the dedicated [chat-first starter](S
 
 The link alone does not give an AI access to Python, source files or the verified Oracle dataset. If those cannot actually be loaded, the assistant must say so rather than inventing validation results. This is a public test preview, not a hosted one-click deckbuilding service.
 
+## One-command validation for Python-capable AI hosts (experimental)
+
+After the AI has authored a deck, it should **attempt the real Validator before presenting a validated result**, instead of stopping at a manual card-count check. The new standard-library CLI automatically runs Gateway preflight and then delegates to the pinned Gateway. In a local checkout:
+
+```sh
+python -m ai_deckbuilding_tool doctor --oracle /private/AtomicCards_slim_v2.json.gz
+python -m ai_deckbuilding_tool discover --oracle /private/AtomicCards_slim_v2.json.gz --collection /private/CURRENT_COLLECTION.csv --collection-confirmed --theme aggro
+python -m ai_deckbuilding_tool validate --oracle /private/AtomicCards_slim_v2.json.gz --collection /private/CURRENT_COLLECTION.csv --collection-confirmed --deck /private/ai_candidate.txt
+```
+
+These commands require **a real local checkout, a user-confirmed current-run collection, and the exact pinned slim Oracle**. They do not download data, install GitHub code or turn a chat-only host into an executable environment. `doctor` without the Oracle explicitly reports incomplete readiness. An actual Gateway child execution and its returned JSON are required before claiming structural validation. Invalid decks must be revised and revalidated; when prerequisites cannot be obtained, report `NOT_EXECUTED` / `UNVERIFIED` instead. See [the agent quickstart](docs/AGENT_QUICKSTART.md#automatic-preflight-and-validation-entry-point).
+
 ## Get started
 
 Use Python 3.12 or 3.13 from a local checkout. Run the [synthetic smoke test](docs/AGENT_QUICKSTART.md#synthetic-smoke-test) to check your setup. The core tools use the standard library. To validate a deck, supply a local MTGJSON AtomicCards JSON or gzip file, a current collection CSV with `Name,Quantity` columns, and a UTF-8 decklist with entries like `4 Lightning Bolt`. Download and verify Oracle data separately using the [MTGJSON verification guide](docs/MTGJSON_Automated_Backup.md). Keep collection CSVs, private decks, and generated reports local.
