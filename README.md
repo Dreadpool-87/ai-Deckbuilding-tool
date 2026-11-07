@@ -29,7 +29,7 @@ python -m ai_deckbuilding_tool discover --collection /private/CURRENT_COLLECTION
 python -m ai_deckbuilding_tool validate --collection /private/CURRENT_COLLECTION.csv --collection-confirmed --deck /private/ai_candidate.txt
 ```
 
-Setup automatically verifies and caches official full MTGJSON AtomicCards. Discovery and validation invoke setup when Oracle arguments are omitted. Users do not manually prepare files or hashes. Actual execution permissions and current-run collection confirmation remain required. Invalid decks must be revised by the AI and revalidated. See [the quickstart](docs/AGENT_QUICKSTART.md#automatic-preflight-and-validation-entry-point).
+If shell `git clone` is unavailable, agents must check the [authorized connector source-recovery route](docs/AGENT_SOURCE_BOOTSTRAP.md) before stopping. Setup automatically verifies and caches official full MTGJSON AtomicCards. Discovery and validation invoke setup when Oracle arguments are omitted. Users do not manually prepare files or hashes. Actual execution permissions and current-run collection confirmation remain required. Invalid decks must be revised by the AI and revalidated. See [the quickstart](docs/AGENT_QUICKSTART.md#automatic-preflight-and-validation-entry-point).
 
 ## Get started
 
