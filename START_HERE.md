@@ -23,6 +23,18 @@ Explain in plain language that real validation also requires executable Python t
 5. Inspect actual exit codes, JSON statuses, failures and uncertainties. `PASS_WITH_LIMITATIONS` is structural validation, **not** proof of format legality, strategy, gameplay or win rate. Never invent executed tests or a completion certificate.
 6. Return the complete decklist, strategic reasoning, source/validation status, and clearly named limitations. Forge and Commander Spellbook integrations are separate experiments; never claim games were played unless they were executed.
 
+## After the AI creates a candidate deck
+
+**Python-capable agents: validation is the next required attempt, not an optional follow-up to offer the user.** Check that a local checkout and the pinned Oracle are actually available. When they are, save the AI-authored deck to a private local file and run the one-command entry point:
+
+```sh
+python -m ai_deckbuilding_tool validate --oracle /private/AtomicCards_slim_v2.json.gz --collection /private/CURRENT_COLLECTION.csv --collection-confirmed --deck /private/candidate.txt
+```
+
+This command performs preflight and delegates to the real pinned Gateway/Validator. Read its JSON status, actual execution evidence, failures and uncertainties. If it rejects the deck, **revise the AI-authored list and execute validation again** before describing it as validated. Do not wait for the user to explicitly ask for this step when all inputs and execution permissions are already available. Use `discover` first when card discovery can run.
+
+If the host cannot obtain an executable local checkout or verified pinned Oracle through permitted capabilities, explain the exact blocker, mark the formal check `NOT_EXECUTED`, and present only a clearly labeled unvalidated proposal. A GitHub link cannot force host execution, and this entry point does not automatically download the Oracle or decide the deck strategy. See [the quickstart](docs/AGENT_QUICKSTART.md#automatic-preflight-and-validation-entry-point).
+
 ## Copy-paste starter message
 
 > Use https://github.com/Dreadpool-87/ai-Deckbuilding-tool as the reference for building a Casual Magic: The Gathering deck. Read `START_HERE.md` and `AGENTS.md`. You choose the cards and strategy; Python only supports and verifies your work. Ask me for my current collection CSV if I have not provided it yet. Check whether you can actually run the tools and access verified Oracle data. Never claim execution or validation without evidence. Keep my collection private.
