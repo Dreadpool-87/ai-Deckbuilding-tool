@@ -103,13 +103,15 @@ class PointerPrGateTests(unittest.TestCase):
         self.assertIn('--verified-at "$VERIFIED_AT_UTC"', source)
         self.assertIn("git fetch --no-tags origin main", source)
         self.assertIn("scripts/check_mtgjson_pointer_pr.py", source)
-        self.assertEqual(source.count('decision="$(check_current_main)"'), 2)
-        self.assertLess(source.index('decision="$(check_current_main)"'),
-                        source.index('git switch -c "$branch"'))
-        self.assertGreater(source.rindex('decision="$(check_current_main)"'),
-                           source.index('git push origin "$branch"'))
-        self.assertLess(source.rindex('decision="$(check_current_main)"'),
-                        source.index("gh pr create --base main"))
+        needle = 'decision="$(check_current_main)"'
+        positions = [i for i in range(len(source)) if source.startswith(needle, i)]
+        self.assertEqual(len(positions), 3)
+        self.assertLess(positions[0], source.index('git switch -c "$branch"'))
+        self.assertGreater(positions[1], source.index('git push origin "$branch"'))
+        self.assertLess(positions[1], source.index("gh pr create --base main"))
+        self.assertGreater(positions[2], source.index("gh pr create --base main"))
+        self.assertIn('if ! gh pr create', source)
+        self.assertIn('PR creation failed while the metadata change is still pending.', source)
         self.assertNotIn("actions/upload-artifact", source)
         self.assertNotIn("gh release create", source)
 
