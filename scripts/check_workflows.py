@@ -40,7 +40,16 @@ def main():
                 and job_name == "private-draft-snapshot"
                 and job.get("if") == "github.event.repository.private == true"
             )
-            expected_permissions = {"contents": "write" if private_bundle_job else "read"}
+            atomic_pointer_job = (
+                path.name == "mtgjson-atomic-update.yml"
+                and job_name == "update-pointer"
+                and job.get("if") == "github.ref == 'refs/heads/main'"
+            )
+            expected_permissions = (
+                {"contents": "write", "pull-requests": "write"} if atomic_pointer_job
+                else {"contents": "write"} if private_bundle_job
+                else {"contents": "read"}
+            )
             if job_permissions != expected_permissions:
                 raise ValueError(f"Unexpected job permissions in {path}: {job_name}")
             for step in job["steps"]:
@@ -80,6 +89,18 @@ def main():
         raw = path.read_text(encoding="utf-8")
         if "gh release create" in raw or "gh release download" in raw or "actions/upload-artifact" in raw and filename != "forge-smoke.yml":
             raise ValueError(f"Workflow appears to re-host an upstream archive: {path}")
+    # The only public MTGJSON write privilege is a reviewed metadata-only PR.
+    atomic = (root / ".github/workflows/mtgjson-atomic-update.yml").read_text(encoding="utf-8")
+    for required in ('17 7 * * 0', 'scripts/record_mtgjson_atomic_pointer.py',
+                     'data/mtgjson_atomic_latest.json', 'gh pr create',
+                     'pull-requests: write'):
+        if required not in atomic:
+            raise ValueError("Missing reviewed weekly MTGJSON pointer mechanism: " + required)
+    for forbidden in ('gh release upload', 'gh release create', 'actions/upload-artifact',
+                      'git push origin main'):
+        if forbidden in atomic:
+            raise ValueError("Weekly MTGJSON verification must not distribute archives or push main")
+
     private = root / ".github/workflows/mtgjson-private-draft-bundle.yml"
     if private.exists():
         proposed = yaml.load(private.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
