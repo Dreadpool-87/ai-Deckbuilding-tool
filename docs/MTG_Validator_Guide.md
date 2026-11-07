@@ -4,24 +4,42 @@
 
 The active Validator reads `4 Lightning Bolt`, `4x Lightning Bolt`, `4× Lightning Bolt`, and `4×Lightning Bolt`. Put a space after an attached ASCII `x` or `X`. With a space after the quantity, the following text is the card name, so `4 Xenagos, God of Revels` preserves the initial X. Write `4x Lightning Bolt` when importing a list with a separated ASCII marker such as `4 x Lightning Bolt`.
 
-**One reusable Python file:** `validator/MTG_Deck_Validator_v1.1.py` in this repository.
+**Executable:** `validator/MTG_Deck_Validator_v1.1.1.py` in this repository.
 
-This is an independent **offline** utility for checking hard constraints in a Magic: The Gathering decklist. It runs on Python 3.9+ and requires only the standard library. No GitHub account, external API, or API key is necessary.
+This is an independent **offline** utility for checking hard constraints in a Magic: The Gathering decklist. It is tested on Python 3.12 and 3.13 and requires only the standard library. Keep the checkout layout or place the matching `card_identity.py` beside the public Validator. No GitHub account, external API, or API key is necessary.
 
 ## Required files
 
-1. `validator/MTG_Deck_Validator_v1.1.py` (or the same standalone file in your local project directory).
-2. Your **active** collection as a CSV containing at least `Name` and `Quantity` (for example, `MTG_Mastercollection_M19_M20_M21_plus_Sorin_Chandra(2).csv`). The validator never silently merges multiple collections.
+1. `validator/MTG_Deck_Validator_v1.1.1.py` and its matching `tools/card_identity.py`.
+2. Your **active** collection as a CSV containing at least `Name` and `Quantity` (for example, `current_collection.csv`). The validator never silently merges multiple collections.
 3. A local MTGJSON `AtomicCards` database, `.json` or `.json.gz` (for example, `AtomicCards_slim_v2.json.gz`). MTGJSON supplies **card facts**, not evidence of ownership.
 4. Your final decklist as a **UTF-8 `.txt` file**, one quantity/name entry per line, such as `4 Shock`, `2 Banefire`, `21 Mountain`. Headings such as `Creatures (26)` are ignored. Unrecognized lines or sideboard sections cause `FAIL`; they are not silently accepted.
+
+## Physical-card names and import
+
+Use exact Oracle names for ordinary deck entries. For a supported multiface record, use the combined AtomicCards name or a corroborated front alias such as `Delver of Secrets`. A reverse or alternate face alone is discovery input only. Front and combined deck entries aggregate for ownership, deck totals and copy limits. The same rules apply to the single Commander name, with additional eligibility and color-identity checks. Malformed metadata, ambiguous names, and unsupported layouts including meld and reversible cards block verification.
+
+CSV inventory labels are case-insensitive. Repeated rows with the same label can represent different owned printings. Mixed front and combined inventory labels are quarantined because the inventory cannot establish whether they list the same copies. Those rows remain quarantined even if only one or two copies are requested. No overlap lower bound is inferred. Reconcile and confirm the inventory before retrying. The Validator reports non-exact identity findings and unresolved collection coverage. Its selected-deck checks can still pass when an unrelated collection row is unresolved, or verified stock alone supplies the required copies.
+
+Transform, modal DFC, Adventure and flip use the front record for printed costs and physical land counts. Split/aftermath use combined printed mana value and display the two costs. Prepare retains its separate two-face integrity audit. Incomplete slim multiface data can require a full dataset. The pinned Gateway real-collection profile still uses its separately managed slim dataset.
+
+Both Validator and Spellbook accept `4 Lightning Bolt`, `4x Lightning Bolt`, `4× Lightning Bolt` and `4×Lightning Bolt`. With a separated ASCII marker, `4 x Lightning Bolt` means quantity 4 and the literal name `x Lightning Bolt`. If your exporter emits a separated marker, configure it to output a supported form or inspect and edit the line explicitly. The parsers preserve names including `X` and `Xenagos, God of Revels`.
+
+### Ownership evidence and result status
+
+`checks.ownership` is `PASS` when verified quantities supply every selected nonbasic card, `FAIL` when at least one relevant shortfall is proven, and `UNVERIFIED` when required stock cannot be established. A quarantined alias label is mapped to its possible canonical cards for uncertainty reporting. No quantity from that row is added. Unrelated unknown rows do not authorize a selected card or conceal a proven shortage.
+
+`failures` contains demonstrable violations. `uncertainties` identifies missing evidence, including unknown stock for an affected selected card. Both arrays may be nonempty when one card has a proven shortage and another has uncertain stock. A separate deck-size or copy-limit violation keeps the final `status: FAIL` even when `checks.ownership: UNVERIFIED`. `identity_findings` describes non-exact deck-entry resolution; `collection_coverage` describes inventory resolution. A known deck identity does not resolve ambiguous inventory quantities.
+
+For a mixed Delver inventory (two front labels and two combined labels), requesting four copies yields `UNVERIFIED`, direct exit 3. A lone front-label row with two copies and four requested yields a proven shortage, `FAIL`, direct exit 1. The Gateway preserves those child statuses with outer `UNVERIFIED` (exit 3, child 3) or `BLOCKED_INVALID_DECK` (exit 2, child 1). Both responses describe executed processes. See the [v1 contract](AGENT_RESULT_CONTRACT_V1.md).
 
 ## Casual 60-card Constructed
 
 Put your files in an accessible local directory, open a terminal, and run:
 
 ```bash
-python validator/MTG_Deck_Validator_v1.1.py \
-  --collection "MTG_Mastercollection_M19_M20_M21_plus_Sorin_Chandra(2).csv" \
+python validator/MTG_Deck_Validator_v1.1.1.py \
+  --collection "current_collection.csv" \
   --oracle "AtomicCards_slim_v2.json.gz" \
   --deck "examples/Synthetic_Red_A.txt" \
   --mode casual --exact-60 \
@@ -35,7 +53,7 @@ Omit `--exact-60` if you want to permit casual Constructed decks with **at least
 ## Commander (simple single-commander decks)
 
 ```bash
-python validator/MTG_Deck_Validator_v1.1.py \
+python validator/MTG_Deck_Validator_v1.1.1.py \
   --collection "my_collection.csv" \
   --oracle "AtomicCards_slim_v2.json.gz" \
   --deck "my_commander_deck.txt" \
@@ -49,7 +67,7 @@ The commander must appear **exactly once among the 100 deck cards** in the TXT d
 
 - `PASS_WITH_LIMITATIONS`: All implemented hard checks passed; limitations documented in the JSON report still apply.
 - `FAIL`: At least one demonstrable problem, such as deck size, ownership, card-name resolution, or copy limits.
-- `UNVERIFIED`: Missing or contradictory card data prevent reliable verification of all required properties.
+- `UNVERIFIED`: Card identity, inventory quantity or other required evidence remains unresolved. An unknown quantity does not prove a shortage.
 - `NOT_CHECKED` under `checks`: The program cannot establish that property. This is **not** a PASS.
 
 The report includes deck totals, overlapping and mutually exclusive card type counts, mana curve, **printed mana values per card**, physical land count, exact hypergeometric probability of 2–5 lands in a seven-card opening hand, and explicitly qualified checks.
@@ -88,9 +106,9 @@ castability, mulligans, gameplay, or win rates.
 
 ## ChatGPT Projects
 
-Upload the `.py` validator as a **project file** alongside the current collection CSV and MTGJSON data. For a new build, upload or paste the exact final TXT decklist and request:
+Stage the public Validator and matching `card_identity.py` side by side in the executable runtime alongside the current collection CSV and MTGJSON data. For a new build, upload or paste the exact final TXT decklist and request:
 
-> Actually execute `MTG_Deck_Validator_v1.1.py` with Python using my active collection CSV, MTGJSON, and this decklist. For casual 60-card decks, use `--exact-60`. Return the actual output/JSON report, errors, and `NOT_CHECKED` categories. If code execution is unavailable, report `NOT EXECUTED` rather than inventing a PASS.
+> Actually execute `MTG_Deck_Validator_v1.1.1.py` with Python using my active collection CSV, MTGJSON, and this decklist. For casual 60-card decks, use `--exact-60`. Return the actual output/JSON report, errors, and `NOT_CHECKED` categories. If code execution is unavailable, report `NOT EXECUTED` rather than inventing a PASS.
 
 **Important:** Uploading a file alone does not execute Python. ChatGPT must have code execution available and actually run the program. The validator is independent of any Builder prompt and can also be used in a fresh chat.
 
@@ -105,3 +123,5 @@ python -m unittest discover -s tests -p "test_*.py" -v
 The tests and example decklists use synthetic fixtures. Use a confirmed local collection when validating a real deck.
 
 **Privacy:** The repository contains the validator, tests, and synthetic example decks, but not your complete collection or the full MTGJSON database. The validator does not access the network.
+
+The legacy `collection_owned_copies` integer is the raw CSV row-quantity sum. Its additive `collection_owned_copies_basis` field identifies `RAW_DECLARED_CSV_QUANTITY_SUM_NOT_VERIFIED_PHYSICAL_TOTAL`. Overlapping aliases can contribute to that raw total, which is never verified physical stock. Use `checks.ownership`, `collection_coverage` and per-card uncertainty for ownership evidence.

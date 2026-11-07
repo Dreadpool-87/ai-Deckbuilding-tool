@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MTG Card Search v0.3: offline, auditable candidate discovery (Python 3.9+).
+"""MTG Card Search v0.3: offline, auditable candidate discovery (tested on Python 3.12 and 3.13).
 
 Consumes MTGJSON AtomicCards and an optional active collection CSV. Separates
 DIRECT printed ability searches from general THEME role suggestions. Heuristic
@@ -11,14 +11,26 @@ construction occurs. The existing v0.1 public search API and CLI remain usable.
 from __future__ import annotations
 
 import argparse
-from collections import Counter, defaultdict
+from collections import Counter
 import csv
 import gzip
+import importlib.util
 import json
 from pathlib import Path
 import re
 import sys
 from typing import Any
+
+# Load only the adjacent or checkout-local helper, including in isolated CLI mode.
+_identity_path = Path(__file__).resolve().with_name('card_identity.py')
+_identity_spec = importlib.util.spec_from_file_location('mtg_card_identity', _identity_path)
+_identity = importlib.util.module_from_spec(_identity_spec)
+_identity_spec.loader.exec_module(_identity)
+
+identity_key = _identity.identity_key
+card_name_index = _identity.card_name_index
+resolve_collection = _identity.resolve_collection
+reject_duplicate_oracle_keys = _identity.reject_duplicate_oracle_keys
 
 VERSION = "0.3.0"
 BASICS = frozenset({
@@ -30,7 +42,6 @@ COLOR_ORDER = "WUBRG"
 MAX_LIMIT = 500
 ROLE_ORDER = ("core", "enabler", "payoff", "synergy", "interaction")
 ROLE_SET = frozenset(ROLE_ORDER)
-FACE_ALIAS_LAYOUTS = frozenset({"adventure", "flip", "modal_dfc", "prepare", "split", "transform"})
 
 # Heuristics are intentionally *small and explicit*; they are not MTG rules.
 # A new mechanic need not be registered to work as an exact Oracle-text theme.
@@ -41,15 +52,6 @@ ALIASES = {
     "+1/+1 counters": "+1/+1 counter",
     "counters": "+1/+1 counter",
 }
-
-
-def reject_duplicate_oracle_keys(pairs: list[tuple[str, Any]]) -> dict:
-    record = {}
-    for key, value in pairs:
-        if key in record:
-            raise ValueError(f"Duplicate Oracle JSON key: {key!r}")
-        record[key] = value
-    return record
 
 
 def read_atomic(path: Path) -> tuple[dict, dict]:
@@ -480,90 +482,6 @@ def build_lifegain_synergy_pairs(matches: list[dict], max_pairs: int) -> dict:
     }
 
 
-def identity_key(name: str) -> str:
-    return "//".join(part.strip().casefold() for part in name.split("//"))
-
-
-def card_name_index(cards: dict) -> tuple[dict, dict]:
-    """Index exact canonical names and corroborated face names separately from claims."""
-    verified = defaultdict(set)
-    possible = defaultdict(set)
-    for canonical, variants in cards.items():
-        if not isinstance(canonical, str):
-            continue
-        full = identity_key(canonical)
-        possible[full].add(canonical)
-        faces = full.split("//") if "//" in full else []
-        for face in filter(None, faces):
-            possible[face].add(canonical)
-        if not isinstance(variants, list) or not variants:
-            continue
-        names_agree = True
-        aliases_agree = len(faces) == 2 and all(faces) and faces[0] != faces[1]
-        expected_sides = dict(zip(faces, ("a", "b")))
-        layouts = set()
-        corroborated_faces = set()
-        for variant in variants:
-            if not isinstance(variant, dict):
-                names_agree = False
-                continue
-            record_name = variant.get("name")
-            record_key = identity_key(record_name) if isinstance(record_name, str) else None
-            if record_key:
-                possible[record_key].add(canonical)
-            if record_name is not None and record_key != full:
-                names_agree = False
-
-            layout = variant.get("layout")
-            if isinstance(layout, str) and layout in FACE_ALIAS_LAYOUTS:
-                layouts.add(layout)
-            elif layout is not None:
-                aliases_agree = False
-
-            side = variant.get("side")
-            if side not in (None, "a", "b"):
-                aliases_agree = False
-            face_name = variant.get("faceName")
-            if face_name is None:
-                continue
-            if not isinstance(face_name, str) or not face_name.strip():
-                aliases_agree = False
-                continue
-            face = identity_key(face_name)
-            possible[face].add(canonical)
-            if face not in expected_sides or side not in (None, expected_sides[face]):
-                aliases_agree = False
-            elif record_key == full:
-                corroborated_faces.add(face)
-        if names_agree:
-            verified[full].add(canonical)
-            if aliases_agree and len(layouts) <= 1:
-                for face in corroborated_faces:
-                    verified[face].add(canonical)
-    return verified, possible
-
-
-def resolve_collection(collection: Counter, verified: dict, possible: dict) -> tuple[Counter, dict]:
-    owned = Counter()
-    absent, unverified = [], []
-    for name, quantity in collection.items():
-        key = identity_key(name)
-        claims = possible.get(key, set())
-        if not claims:
-            absent.append(name)
-        elif len(claims) != 1 or claims != verified.get(key):
-            unverified.append(name)
-        else:
-            owned[next(iter(claims))] += quantity
-    return owned, {
-        "distinct_nonzero_owned_names": sum(quantity > 0 for quantity in collection.values()),
-        "owned_names_absent_from_oracle": sorted(absent),
-        "unverified_owned_names": sorted(unverified),
-        "unresolved_name_count": len(absent) + len(unverified),
-        "identity_status": "UNVERIFIED" if absent or unverified else "MATCHED",
-    }
-
-
 def evaluate_variant(card: dict, *, name: str | None, abilities: list[str],
                      keywords: list[str], oracle_text: list[str],
                      card_type: str | None, subtype: str | None,
@@ -666,7 +584,7 @@ def search(cards: dict, *, name: str | None = None,
     if collection is not None or name is not None:
         verified, possible = card_name_index(cards)
         if collection is not None:
-            owned, collection_coverage = resolve_collection(collection, verified, possible)
+            owned, collection_coverage = resolve_collection(collection, cards, verified, possible)
         if name is not None:
             key = identity_key(name)
             claims = possible.get(key)
@@ -696,6 +614,9 @@ def search(cards: dict, *, name: str | None = None,
         if name_targets is not None and canonical_name not in name_targets:
             continue
         count = owned.get(canonical_name, 0) if owned is not None else None
+        if is_basic and collection is not None:
+            _, basic_name = _identity.physical_name(canonical_name, cards, verified, possible)
+            is_basic = basic_name is not None
         if owned_only and not (is_basic or count > 0):
             continue
         outcomes = [evaluate_variant(
@@ -738,10 +659,19 @@ def search(cards: dict, *, name: str | None = None,
             if roles and not any(role in role_info for role in roles):
                 continue
 
-        card = variants[0]
-        mvs = {v.get("manaValue") for v in variants
-               if type(v.get("manaValue")) in (float, int)}
-        mv = next(iter(mvs)) if len(mvs) == 1 else None
+        displayed = variants
+        pair = _identity.face_pair(canonical_name, variants) if "//" in canonical_name else None
+        if pair is not None and pair[0][0]["layout"] not in {"split", "aftermath"}:
+            displayed = pair[0]
+
+        def agreed_field(field):
+            first = displayed[0].get(field)
+            return first if all(v.get(field) == first for v in displayed) else None
+
+        mv = agreed_field("manaValue")
+        if (not all(type(v.get("manaValue")) in (int, float) for v in displayed)
+                or type(mv) not in (int, float)):
+            mv = None
         identities = {
             frozenset(v["colorIdentity"]) if isinstance(v.get("colorIdentity"), list)
             and all(isinstance(color, str) and color in set(COLOR_ORDER)
@@ -750,16 +680,16 @@ def search(cards: dict, *, name: str | None = None,
         }
         display_identity = ("".join(ch for ch in COLOR_ORDER if ch in next(iter(identities)))
                             if len(identities) == 1 and None not in identities else None)
-        rules = card.get("text")
+        rules = agreed_field("text")
         for role in role_info:
             role_totals[role] += 1
         matches.append({
             "name": canonical_name,
             "mana_value": mv,
             "color_identity": display_identity,
-            "types": card.get("types"),
-            "subtypes": card.get("subtypes"),
-            "keywords": card.get("keywords"),
+            "types": agreed_field("types"),
+            "subtypes": agreed_field("subtypes"),
+            "keywords": agreed_field("keywords"),
             "oracle_text": rules if isinstance(rules, str) else None,
             "owned_copies": count,
             "unlimited_basic_by_project_policy": bool(is_basic),

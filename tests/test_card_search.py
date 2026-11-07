@@ -224,7 +224,8 @@ class CardSearchTests(unittest.TestCase):
         slim = dict(card(full, "", []), faceName="Fixture Front")
         report = TOOL.search({full: [slim]}, name="Fixture Front", owned_only=True,
                              collection=TOOL.Counter({"fixture front": 1}))
-        self.assertEqual(report["results"][0]["name"], full)
+        self.assertEqual(report["results"], [])
+        self.assertEqual(report["collection_coverage"]["identity_status"], "UNVERIFIED")
 
     def test_contradictory_record_name_contends_with_other_canonical_key(self):
         data = {

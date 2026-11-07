@@ -4,22 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       deck_a:
-        description: Repository-relative .txt source for Deck A
+        description: Repository-relative intentionally public .txt source for Deck A
         required: true
         type: string
         default: integrations/forge/decks/Synthetic_Green.txt
       deck_b:
-        description: Repository-relative .txt source for Deck B
+        description: Repository-relative intentionally public .txt source for Deck B
         required: true
         type: string
         default: examples/Synthetic_Red_B.txt
       sha_a:
-        description: Confirmed SHA-256 of Deck A source bytes
+        description: SHA-256 of the deliberately public Deck A source bytes
         required: true
         type: string
         default: 9237626f44aa05e292642f5b4abff1d4a6836c3156a54b3d092da617c6c4b62d
       sha_b:
-        description: Confirmed SHA-256 of Deck B source bytes
+        description: SHA-256 of the deliberately public Deck B source bytes
         required: true
         type: string
         default: 97add7b805d748bdaca17a862cd755a5fc8b6fb1a9f17a11994e67a20e345531
@@ -130,8 +130,6 @@ jobs:
         run: |
           {
             echo "## Forge custom 60-card one-game smoke"
-            echo "Requested A: $DECK_A"
-            echo "Requested B: $DECK_B"
             if [ -f forge-custom-output/result.json ]; then
               echo '~~~json'
               cat forge-custom-output/result.json

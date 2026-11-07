@@ -39,5 +39,5 @@
 - Do not silently modify the Builder, Tester, Validator, accepted `main`, releases, frozen history, Commander, Forge Lite or MTG-AIO. Work on isolated experimental branches and use review.
 - Use English for all project content and agent outputs. Preserve official English card names and technical identifiers.
 
-**Gateway status:** See the [verification record](docs/PUBLIC_PREVIEW_AUDIT.md) for synthetic execution evidence. Portability across agents remains untested. Adding this file to GitHub does not install it as a ChatGPT Project Source or grant Python or file access.
+**Gateway status:** See the [current verification record](docs/IDENTITY_RELIABILITY_AUDIT.md) and [synthetic smoke test](docs/AGENT_QUICKSTART.md#synthetic-smoke-test). Portability across agents remains untested. Adding this file to GitHub does not install it as a ChatGPT Project Source or grant Python or file access.
 

@@ -344,20 +344,18 @@ def main(argv=None) -> int:
         if args.theme:
             reader = load_card_search()
             oracle_data, oracle_meta = reader.read_atomic(args.oracle)
-            owned = Counter({name.casefold(): quantity for name, quantity in deck.items()})
             pair_mode = args.theme.strip().casefold() == 'lifegain'
             themed = reader.search(
-                oracle_data, collection=owned, owned_only=True, theme=args.theme,
+                oracle_data, collection=deck, owned_only=True, theme=args.theme,
                 color_identity=None, limit=min(max(args.limit, 1), 500),
                 synergy=pair_mode, max_synergy_pairs=args.max_synergy_pairs,
             )
             themed['oracle_version'] = oracle_meta.get('version')
             themed['oracle_sha256'] = sha256_file(args.oracle)
-            known_names = {key.casefold() for key in oracle_data}
+            coverage = themed['collection_coverage']
             themed['inventory_name_coverage'] = {
-                'distinct_names_not_in_oracle': sum(
-                    1 for name in owned if name not in known_names
-                ),
+                'distinct_names_not_in_oracle': len(coverage['owned_names_absent_from_oracle']),
+                'distinct_names_unverified': len(coverage['unverified_owned_names']),
             }
             result['theme_candidates'] = themed
             result['theme_vs_combo_note'] = (

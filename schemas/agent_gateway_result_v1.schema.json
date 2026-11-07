@@ -68,6 +68,10 @@
       "$ref": "#/$defs/hashOrNull",
       "description": "Verified Card Search source digest when checked; a matching digest is not execution evidence."
     },
+    "card_identity_sha256": {
+      "$ref": "#/$defs/hashOrNull",
+      "description": "Verified shared card identity source digest when checked."
+    },
     "sources": {
       "type": "object",
       "required": [

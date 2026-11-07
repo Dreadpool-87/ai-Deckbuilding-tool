@@ -21,10 +21,12 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
 CARD_SEARCH = ROOT / "tools" / "card_search.py"
+CARD_IDENTITY = ROOT / "tools" / "card_identity.py"
 VALIDATOR = ROOT / "validator" / "MTG_Deck_Validator_v1.1.1.py"
 ORACLE_PIN = "eb3c03c9303bbf17d50569320f0ab3a7a1d412511198805a36eec03cffff3468"
-VALIDATOR_PIN = "ffe3f958c342b70804941e6cec6604544d027cb8141aaf502f7749120f76bac0"
-CARD_SEARCH_PIN = "c5ceabbaf98d837e0e72598a15906c085c41eb26da74303a408342ff62d7c4e8"
+VALIDATOR_PIN = "58b1015c1138b6bb5bfb2b49cd1762d56ea9cc4687d9e87314f2124570a0a5fd"
+CARD_SEARCH_PIN = "fc90135092476419ab3254c3142d1a8a9df6420e5ad80b54a7180b46822fbc82"
+IDENTITY_PIN = "c4aa79b6f9341f9c0fe5d775b267ec7d4b5e371edf1dfcb99a9eaf644104d239"
 VERSION = "0.3.0-experimental"
 VALIDATOR_VERSION = "1.1.1"
 SCHEMA_VERSION = 1
@@ -300,6 +302,7 @@ def _doctor(args: argparse.Namespace) -> tuple[str, dict]:
     if not runtime_available:
         checks["python_runtime"]["reason"] = "PYTHON_EXECUTABLE_UNAVAILABLE"
     for label, path, expected in (("card_search", CARD_SEARCH, CARD_SEARCH_PIN),
+                                  ("card_identity", CARD_IDENTITY, IDENTITY_PIN),
                                   ("validator", chosen,
                                    VALIDATOR_PROFILES[args.validator_profile])):
         try:
@@ -323,10 +326,13 @@ def _doctor(args: argparse.Namespace) -> tuple[str, dict]:
             checks["oracle"] = {"status": "UNAVAILABLE", "reason": exc.reason}
     ready = (runtime_available and checks["card_search"]["pin_matches"]
              and checks["validator"]["pin_matches"]
+             and checks["card_identity"]["pin_matches"]
              and ("oracle" not in checks or checks["oracle"].get("matches_slim_pin") is True))
     return ("RUNTIME_COMPONENTS_PRESENT" if ready else "UNVERIFIED"), {
         "validator_profile": args.validator_profile,
         "validator_version": VALIDATOR_VERSION if checks["validator"]["pin_matches"] else None,
+        "card_identity_sha256": (checks["card_identity"]["sha256"]
+                                 if checks["card_identity"]["pin_matches"] else None),
         "card_search_sha256": (checks["card_search"]["sha256"]
                                if checks["card_search"]["pin_matches"] else None),
         "checks": checks,
@@ -360,6 +366,12 @@ def _dispatch(args: argparse.Namespace, context: dict | None = None) -> tuple[st
             CARD_SEARCH, CARD_SEARCH_PIN, "CARD_SEARCH_SHA256_MISMATCH")
         context["card_search_sha256"] = card_search_sha
 
+    needs_identity = args.action == "discover" or args.validator_profile == DEFAULT_VALIDATOR_PROFILE
+    if needs_identity:
+        identity_sha, identity_bytes = _pinned_script(
+            CARD_IDENTITY, IDENTITY_PIN, "CARD_IDENTITY_SHA256_MISMATCH")
+        context["card_identity_sha256"] = identity_sha
+
     rc = None
     try:
         with tempfile.TemporaryDirectory(prefix="mtg-agent-gateway-") as directory:
@@ -367,6 +379,9 @@ def _dispatch(args: argparse.Namespace, context: dict | None = None) -> tuple[st
             oracle, collection, deck, input_context, tracked = _sources(
                 args, stage, validate=args.action == "validate")
             context.update(input_context)
+            if needs_identity:
+                _stage_verified_script(stage / "card_identity.py", identity_bytes, identity_sha)
+                tracked += ((CARD_IDENTITY, identity_sha, MAX_SMALL),)
             if args.action == "discover":
                 if not 1 <= args.limit <= 100 or not 0 <= args.offset <= 1000000:
                     raise GatewayError("INVALID_SEARCH_BOUNDS")
