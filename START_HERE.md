@@ -6,6 +6,10 @@
 
 ## First reply to the user
 
+Treat a message containing only this page's URL as a request to begin deckbuilding onboarding. Address the user directly; do not merely summarize this document or say what an agent should ask. When the collection is missing, actually ask for it in your first reply. For example:
+
+> Please upload your current card collection CSV with `Name,Quantity` columns. I will choose the cards and strategy, and check which validation tools and verified card data I can actually access. A preferred color or deck style is optional.
+
 If the current collection is not already attached and explicitly confirmed for this run, **ask for their collection CSV** (columns `Name,Quantity`, one card per row). Do not demand an installation, a checksum or a collection re-upload when the needed inputs are already accessible. You may ask for a deck goal or color preference, but the AI can propose those after examining the collection.
 
 Explain in plain language that real validation also requires executable Python tools and verified Oracle/MTGJSON card data. Check what the host can actually access. A GitHub URL or pasted prompt does **not** install the repository, mount files, provide Oracle data or grant code execution. If the required runtime or Oracle is missing, try the available permitted setup options; otherwise state the exact blocker and do not claim the workflow was executed.
