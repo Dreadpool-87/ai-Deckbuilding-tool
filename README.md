@@ -4,6 +4,14 @@ AI Deckbuilding Tool is a free, open-source toolkit for AI-assisted Magic: The G
 
 **Status** `PUBLIC_TEST_PREVIEW`. The primary workflow is Casual 60+ card deckbuilding. The Agent Gateway, Forge and Commander Spellbook integrations are experimental. See [project status](PROJECT_STATUS.md), [public testing](PUBLIC_TESTING.md), and the [publication checklist](docs/PUBLIC_RELEASE_CHECKLIST.md).
 
+## Start with an AI (recommended)
+
+Give an AI assistant this repository URL or the dedicated [chat-first starter](START_HERE.md). The AI should read the onboarding instructions and **ask for your current card collection CSV** (`Name,Quantity`) if it has not already been provided. The AI builds and reasons about the deck; Python tools support verification.
+
+**For AI agents:** A message containing only this repository URL is a request to begin the onboarding in `START_HERE.md`. Ask the user directly for the missing collection; do not stop at a repository summary or request a separate implementation task.
+
+The link alone does not give an AI access to Python, source files or the verified Oracle dataset. If those cannot actually be loaded, the assistant must say so rather than inventing validation results. This is a public test preview, not a hosted one-click deckbuilding service.
+
 ## Get started
 
 Use Python 3.12 or 3.13 from a local checkout. Run the [synthetic smoke test](docs/AGENT_QUICKSTART.md#synthetic-smoke-test) to check your setup. The core tools use the standard library. To validate a deck, supply a local MTGJSON AtomicCards JSON or gzip file, a current collection CSV with `Name,Quantity` columns, and a UTF-8 decklist with entries like `4 Lightning Bolt`. Download and verify Oracle data separately using the [MTGJSON verification guide](docs/MTGJSON_Automated_Backup.md). Keep collection CSVs, private decks, and generated reports local.
