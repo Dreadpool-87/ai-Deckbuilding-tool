@@ -1,0 +1,15 @@
+{
+  "card_names": 35479,
+  "checksum_url": "https://mtgjson.com/api/v5/AtomicCards.json.gz.sha256",
+  "compressed_bytes": 52106324,
+  "dataset": "AtomicCards.json.gz",
+  "download_url": "https://mtgjson.com/api/v5/AtomicCards.json.gz",
+  "download_url_is_mutable": true,
+  "metadata_url": "https://mtgjson.com/api/v5/Meta.json",
+  "notice": "Hash identifies a verified snapshot, not the future bytes at the mutable URL.",
+  "schema_version": 1,
+  "sha256": "5ff3e5001c722a3f62f0decc162f9cfb0ade5bc6c8ac481ce3ef95d4fc8cf9f8",
+  "source": "MTGJSON",
+  "verified_at_utc": "2026-11-07T14:12:30Z",
+  "version": "5.3.0+20261106"
+}
