@@ -71,9 +71,9 @@ class AttributionIntegrityTests(unittest.TestCase):
             self.assertNotIn("contents: write", content)
         # Verification stays read-only. The ONLY permission exception is a
         # separately scoped job that opens a reviewable metadata-only PR.
-        self.assertIn("permissions:\\n  contents: read", mtgjson)
+        self.assertIn("permissions:\n  contents: read", mtgjson)
         self.assertIn("  update-pointer:", mtgjson)
-        self.assertIn("      contents: write\\n      pull-requests: write", mtgjson)
+        self.assertIn("      contents: write\n      pull-requests: write", mtgjson)
         self.assertEqual(mtgjson.count("contents: write"), 1)
         self.assertEqual(mtgjson.count("pull-requests: write"), 1)
         self.assertIn("data/mtgjson_atomic_latest.json", mtgjson)
