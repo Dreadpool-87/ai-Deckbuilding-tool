@@ -1,5 +1,7 @@
 # Start here: use AI Deckbuilding Tool in a chat
 
+**Compatibility notice:** ChatGPT is the primary evaluated host for this public test preview. **Other AI agents are not yet officially supported or verified for the complete workflow.** Some assistants can read this guide or create preliminary decks, but cross-agent execution of the Python Gateway/Validator remains unproven. A repository link alone does not provide a runnable checkout or verified Oracle card data, including in ChatGPT. Treat unvalidated outputs as proposals, not certified decks.
+
 **For people:** Share the [repository link](https://github.com/Dreadpool-87/ai-Deckbuilding-tool) or this page with a capable AI assistant. The AI is the deckbuilder; Python tools only retrieve and verify facts and enforce the workflow.
 
 **For AI agents:** Read [AGENTS.md](AGENTS.md), then [the optional workflow guide](docs/AGENT_WORKFLOW_MVP.md) when local Python execution is available. The active Casual specification is [Builder v7.4](prompts/casual/builder/stable/MTG_Deck_Builder_v7.4_full.md); [Tester v3.4.2](prompts/casual/tester/MTG_Deck_Tester_v3.4.2_full.md) is optional and is not a game simulator. Do not substitute archived or draft prompts.
