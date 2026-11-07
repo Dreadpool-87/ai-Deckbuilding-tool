@@ -133,9 +133,19 @@ jobs:
           fi
           existing="$(gh pr list --base main --head "$branch" --state open --json number --jq 'length')"
           if [ "$existing" = "0" ]; then
-            gh pr create --base main --head "$branch" \
+            if ! gh pr create --base main --head "$branch" \
               --title "chore: refresh MTGJSON AtomicCards pointer" \
-              --body "Weekly verification detected a new official MTGJSON AtomicCards version or checksum. This change contains only an upstream URL, SHA-256, version, verification metadata and SHA256SUMS entry. No dataset is redistributed. Review before merging."
+              --body "Weekly verification detected a new official MTGJSON AtomicCards version or checksum. This change contains only an upstream URL, SHA-256, version, verification metadata and SHA256SUMS entry. No dataset is redistributed. Review before merging."; then
+              # A maintainer may have merged the branch after our last check.
+              # Only reinterpret a failed PR creation as success if live main
+              # NOW contains the same or a more recently verified snapshot.
+              decision="$(check_current_main)"
+              if [ "$decision" = "PROPOSE" ]; then
+                echo "PR creation failed while the metadata change is still pending." >&2
+                exit 1
+              fi
+              echo "No metadata PR needed after concurrent main update: $decision"
+            fi
           else
             echo "Metadata pointer pull request is already open."
           fi
