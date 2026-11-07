@@ -10,7 +10,7 @@ Python-capable AI agents must choose the *actual* Validator file selected for th
 
 | `--validator-profile` | Expected SHA-256 of local Validator bytes | Source and status | P4 execution evidence |
 | --- | --- | --- | --- |
-| `github-main-v0.2` (default) | `2e66b23000979ce0b2fee92ec5db8e7abd6f8c296e580ab9357303537cd79240` | Public preview checkout, `validator/MTG_Deck_Validator_v1.1.1.py` | [Current audit evidence](IDENTITY_RELIABILITY_AUDIT.md) |
+| `github-main-v0.2` (default) | `58b1015c1138b6bb5bfb2b49cd1762d56ea9cc4687d9e87314f2124570a0a5fd` | Public preview checkout, `validator/MTG_Deck_Validator_v1.1.1.py` | [Current audit evidence](IDENTITY_RELIABILITY_AUDIT.md) |
 | `project-prepare-candidate` | `c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d` | Separately managed ChatGPT Project Source, *not automatically synchronized* | **NOT_TESTED with this gateway**; the actual Project Source binary was not supplied to CI |
 | `frozen-beta-20261022` | `8749b50d0aeaa52124a99271a0ab40bcc979350c6e8b5e9074c4f28d63a3d1ac` | Old frozen GitHub `release/casual-private-beta-2026-10-22`, rollback/reference only | **NOT_TESTED with this gateway**; don't confuse compatible CLI shape with executed behavioral verification |
 

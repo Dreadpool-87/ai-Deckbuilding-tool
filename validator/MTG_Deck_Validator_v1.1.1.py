@@ -401,6 +401,13 @@ def validate(owned, database, deck, mode='casual', commander=None,
         commander = canonical or commander
     owned_by_name, ownership_coverage = _identity.resolve_collection(
         owned, database, verified, possible)
+    # Quarantined inventory labels may describe stock for a canonical card.
+    # They supply no verified quantity, but are not evidence of zero stock.
+    uncertain_owned_cards = {
+        canonical
+        for label in ownership_coverage['unverified_owned_names']
+        for canonical in possible.get(_identity.identity_key(label), ())
+    }
     count = sum(deck.values())
     checks['deck_parsing'] = 'FAIL' if parse_errors else 'PASS'
 
@@ -492,7 +499,10 @@ def validate(owned, database, deck, mode='casual', commander=None,
         if name in ambiguous:
             ownership_uncertain = limit_uncertain = True
         if name not in ambiguous and not basic_unlimited and quantity > owned_by_name.get(name, 0):
-            if basic_ruled_out:
+            if name in uncertain_owned_cards:
+                ownership_uncertain = True
+                uncertainties.append('Owned quantity not established for %s: unresolved collection labels' % name)
+            elif basic_ruled_out:
                 insufficient.append({'card': name, 'needed': quantity, 'owned': owned_by_name.get(name, 0)})
             else:
                 ownership_uncertain = True
@@ -695,6 +705,8 @@ def main(argv=None):
         report['oracle_version'] = metadata.get('version', 'unknown')
         report['collection_unique_names'] = len(owned)
         report['collection_owned_copies'] = sum(owned.values())
+        report['collection_owned_copies_basis'] = (
+            'RAW_DECLARED_CSV_QUANTITY_SUM_NOT_VERIFIED_PHYSICAL_TOTAL')
         rendered = json.dumps(report, ensure_ascii=False, indent=2) + '\n'
         print(rendered, end='')
         if args.output:

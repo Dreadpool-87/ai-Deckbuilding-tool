@@ -616,6 +616,54 @@ class GatewayTests(unittest.TestCase):
         self.assertFalse(report["executed"])
         self.assertEqual(report["reason_codes"], ["CARD_IDENTITY_SHA256_MISMATCH"])
 
+    def test_identity_helper_is_staged_and_original_drift_is_detected(self):
+        import contextlib
+        import io
+        import runpy
+        original = (ROOT / "tools" / "card_identity.py").read_bytes()
+        for action, extra in (("discover", ["--theme", "Shock"]),
+                              ("validate", ["--deck", str(self.deck), "--exact-60"])):
+            for restore in (False, True):
+                with self.subTest(action=action, restore=restore):
+                    gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
+                    candidate = self.dir / "selected-identity.py"
+                    candidate.write_bytes(original)
+                    marker = self.dir / "unapproved-helper-executed"
+                    gateway["_dispatch"].__globals__["CARD_IDENTITY"] = candidate
+                    real_run = gateway["_bounded_process"]
+                    stages = []
+
+                    def replace_original_at_launch(command, **kwargs):
+                        helper = Path(command[5]).parent / "card_identity.py"
+                        self.assertEqual(helper.read_bytes(), original)
+                        self.assertNotEqual(helper, candidate)
+                        stages.append(helper)
+                        candidate.write_text(
+                            "from pathlib import Path\n" + f"Path({str(marker)!r}).touch()\n")
+                        try:
+                            result = real_run(command, **kwargs)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            return result
+                        finally:
+                            if restore:
+                                candidate.write_bytes(original)
+
+                    output = io.StringIO()
+                    with self.mock_process(gateway, side_effect=replace_original_at_launch):
+                        with contextlib.redirect_stdout(output):
+                            code = gateway["main"]([action, *map(str, self.common()), *extra])
+                    report = json.loads(output.getvalue())
+                    self.assertEqual(code, 0 if restore else 3)
+                    self.assertEqual(report["child_exit_code"], 0)
+                    self.assertEqual(report["tool_execution"],
+                                     "EXECUTED" if restore else "FAILED_AFTER_START")
+                    if not restore:
+                        self.assertEqual(report["reason_codes"], ["SOURCE_CHANGED_DURING_EXECUTION"])
+                        self.assertEqual(report["status"], "UNVERIFIED")
+                    self.assertFalse(marker.exists())
+                    self.assertEqual(len(stages), 1)
+                    self.assertFalse(stages[0].exists(), "Helper stage leaked")
+
     def test_discover_executes_captured_code_even_when_original_is_swapped_at_launch(self):
         import runpy
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")

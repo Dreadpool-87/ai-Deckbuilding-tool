@@ -19,11 +19,19 @@ This is an independent **offline** utility for checking hard constraints in a Ma
 
 Use exact Oracle names for ordinary deck entries. For a supported multiface record, use the combined AtomicCards name or a corroborated front alias such as `Delver of Secrets`. A reverse or alternate face alone is discovery input only. Front and combined deck entries aggregate for ownership, deck totals and copy limits. The same rules apply to the single Commander name, with additional eligibility and color-identity checks. Malformed metadata, ambiguous names, and unsupported layouts including meld and reversible cards block verification.
 
-CSV inventory labels are case-insensitive. Repeated rows with the same label can represent different owned printings. Mixed front and combined inventory labels are quarantined because the inventory cannot establish whether they list the same copies. Reconcile and confirm the inventory before retrying. The Validator reports non-exact identity findings and unresolved collection coverage. Its selected-deck checks can still pass when an unrelated collection row is unresolved.
+CSV inventory labels are case-insensitive. Repeated rows with the same label can represent different owned printings. Mixed front and combined inventory labels are quarantined because the inventory cannot establish whether they list the same copies. Those rows remain quarantined even if only one or two copies are requested. No overlap lower bound is inferred. Reconcile and confirm the inventory before retrying. The Validator reports non-exact identity findings and unresolved collection coverage. Its selected-deck checks can still pass when an unrelated collection row is unresolved, or verified stock alone supplies the required copies.
 
 Transform, modal DFC, Adventure and flip use the front record for printed costs and physical land counts. Split/aftermath use combined printed mana value and display the two costs. Prepare retains its separate two-face integrity audit. Incomplete slim multiface data can require a full dataset. The pinned Gateway real-collection profile still uses its separately managed slim dataset.
 
 Both Validator and Spellbook accept `4 Lightning Bolt`, `4x Lightning Bolt`, `4× Lightning Bolt` and `4×Lightning Bolt`. With a separated ASCII marker, `4 x Lightning Bolt` means quantity 4 and the literal name `x Lightning Bolt`. If your exporter emits a separated marker, configure it to output a supported form or inspect and edit the line explicitly. The parsers preserve names including `X` and `Xenagos, God of Revels`.
+
+### Ownership evidence and result status
+
+`checks.ownership` is `PASS` when verified quantities supply every selected nonbasic card, `FAIL` when at least one relevant shortfall is proven, and `UNVERIFIED` when required stock cannot be established. A quarantined alias label is mapped to its possible canonical cards for uncertainty reporting. No quantity from that row is added. Unrelated unknown rows do not authorize a selected card or conceal a proven shortage.
+
+`failures` contains demonstrable violations. `uncertainties` identifies missing evidence, including unknown stock for an affected selected card. Both arrays may be nonempty when one card has a proven shortage and another has uncertain stock. A separate deck-size or copy-limit violation keeps the final `status: FAIL` even when `checks.ownership: UNVERIFIED`. `identity_findings` describes non-exact deck-entry resolution; `collection_coverage` describes inventory resolution. A known deck identity does not resolve ambiguous inventory quantities.
+
+For a mixed Delver inventory (two front labels and two combined labels), requesting four copies yields `UNVERIFIED`, direct exit 3. A lone front-label row with two copies and four requested yields a proven shortage, `FAIL`, direct exit 1. The Gateway preserves those child statuses with outer `UNVERIFIED` (exit 3, child 3) or `BLOCKED_INVALID_DECK` (exit 2, child 1). Both responses describe executed processes. See the [v1 contract](AGENT_RESULT_CONTRACT_V1.md).
 
 ## Casual 60-card Constructed
 
@@ -59,7 +67,7 @@ The commander must appear **exactly once among the 100 deck cards** in the TXT d
 
 - `PASS_WITH_LIMITATIONS`: All implemented hard checks passed; limitations documented in the JSON report still apply.
 - `FAIL`: At least one demonstrable problem, such as deck size, ownership, card-name resolution, or copy limits.
-- `UNVERIFIED`: Missing or contradictory card data prevent reliable verification of all required properties.
+- `UNVERIFIED`: Card identity, inventory quantity or other required evidence remains unresolved. An unknown quantity does not prove a shortage.
 - `NOT_CHECKED` under `checks`: The program cannot establish that property. This is **not** a PASS.
 
 The report includes deck totals, overlapping and mutually exclusive card type counts, mana curve, **printed mana values per card**, physical land count, exact hypergeometric probability of 2–5 lands in a seven-card opening hand, and explicitly qualified checks.
@@ -115,3 +123,5 @@ python -m unittest discover -s tests -p "test_*.py" -v
 The tests and example decklists use synthetic fixtures. Use a confirmed local collection when validating a real deck.
 
 **Privacy:** The repository contains the validator, tests, and synthetic example decks, but not your complete collection or the full MTGJSON database. The validator does not access the network.
+
+The legacy `collection_owned_copies` integer is the raw CSV row-quantity sum. Its additive `collection_owned_copies_basis` field identifies `RAW_DECLARED_CSV_QUANTITY_SUM_NOT_VERIFIED_PHYSICAL_TOTAL`. Overlapping aliases can contribute to that raw total, which is never verified physical stock. Use `checks.ownership`, `collection_coverage` and per-card uncertainty for ownership evidence.

@@ -68,3 +68,34 @@ The structural scope follows the [Wizards rules reference](https://magic.wizards
 - `python scripts/check_workflows.py` and `python scripts/audit_public_history.py --repo . --strict` check YAML/policy and reachable Git privacy patterns. Pattern checks are heuristic.
 
 Review and rollback are independent of the experimental prompt comparison. If this code change is later accepted and a regression is found, revert the PR as a unit so the Validator, Card Search, helper, Gateway pins and manifest stay synchronized. GitHub does not change ChatGPT Project Sources.
+
+## Focused ownership-status follow-up — 2026-11-07
+
+**Starting heads** `main` `0fd38ab2846a0e4c575e6ecac947b006407f913b`, PR #2 `af1434959626a87c61b41f95ebc45a86a1052977`, draft PR #3 `0046bb51eb0e4479b9550bc0482b824e7f7f5e52`. Both PRs were open with no comments/reviews in the fetched discussion. Their published histories were fetched into isolated worktrees. Earlier results above belong to their declared source revisions.
+
+**CONFIRMED** The mixed-alias hypothesis reproduced through the actual Validator and Gateway. Inventory rows `Delver of Secrets,2` and `Delver of Secrets // Insectile Aberration,2` were quarantined, leaving no verified quantity. The previous Validator interpreted that absence as zero proven owned and emitted an unjustified shortage. Three-value stock now uses the resolver's existing unverified labels and possible canonical claims. A selected card affected by those claims yields an uncertainty when the verified stock alone is insufficient. No helper API, quantity aggregation or Gateway schema changed.
+
+The conservative rule withholds all overlapped stock even for one or two requested copies. Duplicate same-label printing rows still sum. Zero-quantity labels add no uncertainty. A verified canonical row can independently supply a deck despite an extra unresolved reverse label. Unrelated unknown inventory cannot authorize a card, conceal a proven shortfall or invalidate sufficient verified stock. Independent size and copy-limit violations retain overall `FAIL`. A verified shortage for another card retains `checks.ownership: FAIL` and leaves the uncertain card's explanation visible.
+
+The executable regression module `tests/test_ownership_evidence.py` exercises direct CLI and actual Gateway children for mixed labels at quantities 1/2/4, true shortfalls, positive canonical stock, mixed deck aliases at four/five copies, independent failures, reverse-only labels, competing aliases, zero/blank/duplicate CSV rows, quoted names, several multiface layouts, malformed faces and a single-face control. Card Search coverage agrees after case normalization of displayed source labels. An additional Gateway regression executes captured identity-helper bytes for both discovery and default validation, while restored and persistent mutations of the original helper test the staging and drift boundary.
+
+An independent same-host agent reviewed the complete PR #2 diff, the ownership correction and its failure paths, then ran the ownership, physical identity and Gateway suites. This establishes a separate review, not an independent model/host claim.
+
+The exact-head hosted run URLs, source identities and final review verdict are recorded in [PR #2](https://github.com/Dreadpool-87/ai-Deckbuilding-tool/pull/2). Project v1.6 requires the [manual staging and rollback procedure](CHATGPT_PROJECT_PRIVATE_BETA_SETUP.md#optional-manual-migration-from-project-v16); its external profiles remain `NOT_TESTED`. A later migration must use the final reviewed Validator digest and unchanged matching helper, and must test uncertain-overlap and proven-shortfall outcomes before activation.
+
+
+The legacy `collection_owned_copies` total is retained for existing consumers and now carries the explicit `collection_owned_copies_basis: RAW_DECLARED_CSV_QUANTITY_SUM_NOT_VERIFIED_PHYSICAL_TOTAL`. That raw sum may include quarantined alias rows. It is not a claim that four mixed-label copies are physically owned.
+
+**FIXED_AND_TESTED** The focused synthetic red run had 13 failing subcases across 11 test methods before the correction. The completed targeted suite has 12 methods and exercises actual direct/Gateway processes. A separate expected-red metadata check confirmed the missing basis field before it was added. All targeted methods pass after the fix.
+
+Affected real-data integration was repeated with synthetic ownership against the same verified full gzip and exact frozen slim bytes documented above. Full-data Delver and slim-data Brazen Borrower each produced the following observed outcomes.
+
+| Inventory for four requested copies | Direct Validator | Gateway / child exit | Card Search |
+| --- | --- | --- | --- |
+| Two front-label + two combined-label copies | `UNVERIFIED`, ownership `UNVERIFIED`, exit 3 | `UNVERIFIED`, 3 / 3 | 0 owned candidates; coverage `UNVERIFIED`, process exit 0 |
+| Two front-label copies only | `FAIL`, ownership `FAIL`, exit 1 | `BLOCKED_INVALID_DECK`, 2 / 1 | Not repeated for this case |
+| Four combined-label copies | `PASS_WITH_LIMITATIONS`, ownership `PASS`, exit 0 | `VALIDATED_WITH_LIMITATIONS`, 0 / 0 | Earlier positive discovery evidence retained |
+
+The new real-data checks changed only inventory and selected deck inputs. Card source identity and the earlier layout/Spellbook acceptance evidence are retained. No new Forge gameplay, private collection or external Project execution is claimed.
+
+Final local verification on Python 3.12.14 and 3.13.5 is recorded separately from the earlier 279-test head. Both runtimes passed 292 root tests, 6 Forge offline tests and 23 Spellbook offline tests, every suite exit 0. The focused ownership suite passed 12 tests and the Gateway suite passed 44. Source pins, the complete checksum manifest, workflow policy and strict reachable-history privacy scan were rechecked. The final counts and exact-head push/PR Actions evidence are in the PR description. Baseline snapshots and external profile hashes remain unchanged. The source edit is limited to uncertainty-aware ownership and the additive raw-sum basis, with synchronized public Validator pin and manifest.
