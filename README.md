@@ -25,6 +25,8 @@ Omit `--exact-60` for decks larger than 60 cards. A result of `PASS_WITH_LIMITAT
 
 Use the [card naming and import guide](docs/MTG_Validator_Guide.md#physical-card-names-and-import) for aliases, disputed inventory labels and spaced `x` markers. Full AtomicCards and the Gateway-pinned slim dataset were tested with synthetic ownership. The real-collection Gateway requires the frozen slim dataset. AI prompt equivalence across models and the external Project Source migration are `NOT_VERIFIED`.
 
+An optional [experimental AI-led workflow controller](docs/AGENT_WORKFLOW_MVP.md) gates completion on actual Gateway evidence. The AI selects the deck and authors its strategic review.
+
 ## Run the offline tests
 
 ```sh
