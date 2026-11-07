@@ -6,13 +6,21 @@ Run 'python -m ai_deckbuilding_tool --help' from a local repository checkout.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-GATEWAY = ROOT / "tools" / "agent_gateway.py"
+MAX_SOURCE_BYTES = 4 * 1024 * 1024
+PINNED_CODE = {
+    "tools/agent_gateway.py": "6422dfcb65c91e2a6197421515005b3b2f42805ead5f840218c12ae571be4534",
+    "tools/card_search.py": "fc90135092476419ab3254c3142d1a8a9df6420e5ad80b54a7180b46822fbc82",
+    "tools/card_identity.py": "c4aa79b6f9341f9c0fe5d775b267ec7d4b5e371edf1dfcb99a9eaf644104d239",
+    "validator/MTG_Deck_Validator_v1.1.1.py": "58b1015c1138b6bb5bfb2b49cd1762d56ea9cc4687d9e87314f2124570a0a5fd",
+}
 MAX_GATEWAY_OUTPUT = 2 * 1024 * 1024
 TIMEOUT_SECONDS = 120
 KNOWN_STATUSES = {
@@ -37,18 +45,38 @@ def _reject_constant(value: str) -> None:
 
 
 def _gateway(action: str, flags: list[str]) -> tuple[int, dict]:
-    if not GATEWAY.is_file():
-        raise RuntimeError("GATEWAY_FILE_MISSING")
-    try:
-        completed = subprocess.run(
-            [sys.executable, "-I", "-S", "-B", "-Xutf8", str(GATEWAY), action, *flags],
-            cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True,
-            timeout=TIMEOUT_SECONDS, check=False,
-        )
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("GATEWAY_TIMEOUT") from None
-    except OSError:
-        raise RuntimeError("GATEWAY_NOT_STARTED") from None
+    # Run SHA-checked copies, not a mutable repository file or host startup hook.
+    # The original Gateway performs its own input snapshots and child-code pinning.
+    with tempfile.TemporaryDirectory(prefix="ai-deckbuilding-cli-") as directory:
+        stage = Path(directory)
+        for relative, expected in PINNED_CODE.items():
+            source = ROOT / relative
+            try:
+                if any(parent.is_symlink() for parent in (source, *source.parents)):
+                    raise RuntimeError("UNSAFE_LOCAL_CODE_SOURCE")
+                if not source.is_file() or source.stat().st_size > MAX_SOURCE_BYTES:
+                    raise RuntimeError("LOCAL_CODE_SOURCE_UNAVAILABLE")
+                content = source.read_bytes()
+            except OSError:
+                raise RuntimeError("LOCAL_CODE_SOURCE_UNAVAILABLE") from None
+            if (len(content) > MAX_SOURCE_BYTES
+                    or hashlib.sha256(content).hexdigest() != expected):
+                raise RuntimeError("LOCAL_CODE_SHA256_MISMATCH")
+            target = stage / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
+            target.chmod(0o600)
+        try:
+            completed = subprocess.run(
+                [sys.executable, "-I", "-S", "-B", "-Xutf8",
+                 str(stage / "tools" / "agent_gateway.py"), action, *flags],
+                cwd=stage, stdin=subprocess.DEVNULL, capture_output=True,
+                timeout=TIMEOUT_SECONDS, check=False,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("GATEWAY_TIMEOUT") from None
+        except OSError:
+            raise RuntimeError("GATEWAY_NOT_STARTED") from None
     if len(completed.stdout) > MAX_GATEWAY_OUTPUT:
         raise RuntimeError("GATEWAY_OUTPUT_TOO_LARGE")
     try:
@@ -121,6 +149,11 @@ def _report(action: str, status: str, *, reason: str | None = None,
 
 
 def run(args: argparse.Namespace) -> tuple[int, dict]:
+    # Resolve user inputs before the Gateway runs from a private staged checkout.
+    for field in ("oracle", "collection", "deck"):
+        value = getattr(args, field, None)
+        if value:
+            setattr(args, field, str(Path(value).absolute()))
     # The Gateway's doctor validates the local Python/scripts and, in real mode,
     # the original pinned Oracle bytes before the requested action can start.
     doctor_flags = ["--oracle", args.oracle] if args.oracle and not getattr(args, "synthetic", False) else []
