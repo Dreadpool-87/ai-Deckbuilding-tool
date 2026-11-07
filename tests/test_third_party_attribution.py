@@ -65,7 +65,20 @@ class AttributionIntegrityTests(unittest.TestCase):
         for content in (forge, smoke, mtgjson):
             self.assertNotIn("gh release create", content)
             self.assertNotIn("gh release download", content)
+            self.assertNotIn("gh release upload", content)
+            self.assertNotIn("actions/upload-artifact", content)
+        for content in (forge, smoke):
             self.assertNotIn("contents: write", content)
+        # Verification stays read-only. The ONLY permission exception is a
+        # separately scoped job that opens a reviewable metadata-only PR.
+        self.assertIn("permissions:\\n  contents: read", mtgjson)
+        self.assertIn("  update-pointer:", mtgjson)
+        self.assertIn("      contents: write\\n      pull-requests: write", mtgjson)
+        self.assertEqual(mtgjson.count("contents: write"), 1)
+        self.assertEqual(mtgjson.count("pull-requests: write"), 1)
+        self.assertIn("data/mtgjson_atomic_latest.json", mtgjson)
+        self.assertIn("gh pr create", mtgjson)
+        self.assertNotIn("git push origin main", mtgjson)
 
 
 if __name__ == "__main__":
