@@ -12,6 +12,10 @@ Give an AI assistant this repository URL or the dedicated [chat-first starter](S
 
 The link alone does not give an AI access to Python, source files or the verified Oracle dataset. If those cannot actually be loaded, the assistant must say so rather than inventing validation results. This is a public test preview, not a hosted one-click deckbuilding service.
 
+## MTGJSON data freshness (no redistribution)
+
+[Weekly AtomicCards verification](.github/workflows/mtgjson-atomic-update.yml) runs every **Sunday at 07:17 UTC**. It verifies the complete official MTGJSON download in temporary runner storage, and proposes a reviewed PR containing only [the official URL, version and SHA-256 pointer](data/README.md) when the version or digest changes. **No MTGJSON card archive is stored in Git history, GitHub Releases or Actions artifacts.** The official download URL is mutable; verify every downloaded archive against the current upstream checksum. This pointer does not yet activate full-AtomicCards support in the existing real-collection Gateway.
+
 ## Get started
 
 Use Python 3.12 or 3.13 from a local checkout. Run the [synthetic smoke test](docs/AGENT_QUICKSTART.md#synthetic-smoke-test) to check your setup. The core tools use the standard library. To validate a deck, supply a local MTGJSON AtomicCards JSON or gzip file, a current collection CSV with `Name,Quantity` columns, and a UTF-8 decklist with entries like `4 Lightning Bolt`. Download and verify Oracle data separately using the [MTGJSON verification guide](docs/MTGJSON_Automated_Backup.md). Keep collection CSVs, private decks, and generated reports local.
