@@ -90,7 +90,7 @@ Only add `--exact-60` when exactly 60 was required; Casual itself allows 60 or m
 
 Report `EXECUTED` vs `NOT_EXECUTED` for each actual tool call, the exact source context, validation status, and which strategic statements are hypotheses. If inputs are missing or invalid, return `INPUT_ERROR` / `UNVERIFIED` when appropriate; never quietly substitute a synthetic collection as real ownership.
 
-**Current boundary:** The Gateway workflow and source hardening passed independent synthetic acceptance. Real collections, the pinned production slim Oracle, alternate Validator binaries and cross-agent portability remain outside that test scope. See [full AtomicCards smoke evidence](IDENTITY_RELIABILITY_AUDIT.md). Swap Advisor work remains separate and on hold.
+**Current boundary:** The Gateway workflow and source hardening passed independent synthetic acceptance. The full AtomicCards and pinned slim datasets were exercised with synthetic ownership. Real collections, alternate Validator binaries and cross-agent portability remain outside that test scope. See the [Oracle smoke evidence](IDENTITY_RELIABILITY_AUDIT.md). Swap Advisor work remains separate and on hold.
 
 
 ## Synthetic smoke test

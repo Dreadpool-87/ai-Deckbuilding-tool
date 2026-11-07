@@ -46,14 +46,23 @@ Separate direct Validator function calls against the same snapshot with syntheti
 | Insectile Aberration | Reverse face / `FAIL` | No legal physical name established by this input |
 | X | Ordinary / `PASS_WITH_LIMITATIONS` | Preserved literal name, MV 2 |
 
-The official snapshot exercises synthetic ownership only. Gateway `doctor` exited 0 without an Oracle (local components ready, no child), and exited 3 with the full gzip (frozen slim pin mismatch, no child). The pinned production slim bytes were unavailable. Some older slim snapshots may lack face metadata needed by the stricter policy. Current-run confirmed multiface behavior on the frozen slim file remains `NOT_VERIFIED`.
+The full upstream snapshot exercises synthetic ownership only. Gateway `doctor` exited 0 without an Oracle (local components ready, no child), and exited 3 with the full gzip (frozen slim pin mismatch, no child).
+
+### Exact frozen slim profile
+
+Two separate copies of `AtomicCards_slim_v2.json.gz` matched the Gateway's production pin in the [source record](AGENT_SOURCE_COMPATIBILITY_P4.md). The data is version `5.3.0+20261011`, slim 2.0, with 3,427 canonical names. The same hash was used in all slim tests.
+
+- `doctor --oracle` returned `RUNTIME_COMPONENTS_PRESENT` (exit 0, no child).
+- With synthetic ownership of four Brazen Borrowers and four Shocks, direct Card Search found four owned copies under the combined Adventure name. Gateway `discover --theme damage` returned Shock with four copies (`CANDIDATES_NOT_VALIDATED`, gateway/child 0/0).
+- Gateway `validate` accepted a deck of four Brazen Borrowers and 56 Islands (`VALIDATED_WITH_LIMITATIONS`, 0/0, `FROZEN_SLIM_PIN`, four MV-3 nonlands). Direct checks against representative slim transform, split, Adventure, and Prepare pairs passed, including the Prepare audit for Bloodline Recollector. The snapshot contains no modal DFC, meld or flip records and does not contain Delver.
+- The slim acceptance used synthetic ownership. Current-run user authorization and independently managed Project Validator bytes were outside the test. No slim snapshot was added to Git.
 
 The structural scope follows the [Wizards rules reference](https://magic.wizards.com/en/rules) and [modal DFC rulings](https://magic.wizards.com/en/news/feature/kaldheim-release-notes-2021-01-22). Neither physical-land counts nor printed costs predict the availability or timing of the alternate side.
 
 ## Integration and security evidence
 
 - Ran the documented offline suites and the [synthetic smoke](AGENT_QUICKSTART.md#synthetic-smoke-test). Baseline on each of Python 3.12.14 and 3.13.5 was 266 root, 6 Forge, 23 Spellbook. The final branch reached 279 root, 6 Forge, 23 Spellbook, with exit 0 for every suite on both versions.
-- Ran `timeout 90s python integrations/commander-spellbook/tests/live_bulk_smoke.py` on the baseline. The [official export](https://json.commanderspellbook.com/variants.json.gz) version 7.3.6, timestamp `2026-11-06T22:11:42.450454+00:00`, archive SHA-256 `0ba813e9fb7f74ef139e0122844f2f8efadf5fb5da22858cd8566be7eb366556`, parsed 121,296 variants and matched the expected synthetic ingredient pair (exit 0). No Forge gameplay was executed.
+- Ran `timeout 90s python integrations/commander-spellbook/tests/live_bulk_smoke.py` on the baseline. The [official export](https://json.commanderspellbook.com/variants.json.gz) version 7.3.6, timestamp `2026-11-06T22:11:42.450454+00:00`, archive SHA-256 `0ba813e9fb7f74ef139e0122844f2f8efadf5fb5da22858cd8566be7eb366556`, parsed 121,296 variants and matched the expected synthetic ingredient pair (exit 0). The final branch repeated the same live smoke on a subsequent 7.3.6 export, timestamp `2026-11-07T00:11:39.094648+00:00`, archive SHA-256 `fbafd28387f7bbb46fadeb97b1d3f2b269df73d702b582863e1ec5842f54a50d`. It again parsed 121,296 variants and matched the synthetic pair (exit 0). No Forge gameplay was executed.
 - All seven workflows were reviewed. Checkout disables persisted credentials. The sole write-permission exception is the private draft backup with separate visibility checks. Custom Forge verifies cache/download size and SHA before extraction and passes dispatch data through quoted environment variables.
 - Official upstream Git tags resolved to all five exact pins: checkout v6.1.0, setup-python v6.3.0, setup-java v4.9.1, cache v4.3.0 and upload-artifact v4.6.2. No pin changes. The [Python support policy](https://devguide.python.org/versions/) supports the existing 3.12 and 3.13 matrix.
 - `python scripts/check_workflows.py` and `python scripts/audit_public_history.py --repo . --strict` check YAML/policy and reachable Git privacy patterns. Pattern checks are heuristic.
