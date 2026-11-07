@@ -1,5 +1,23 @@
 # AI Deckbuilding Tool — Current Project Status
 
+## Current public checkout (2026-11-07)
+
+**Scope:** `PUBLIC_TEST_PREVIEW`, primarily Casual 60+ decks. This repository is an **AI support toolkit**, not a standalone Python deckbuilding algorithm. The AI selects cards and strategy.
+
+| Current component | Status and authoritative reference |
+| --- | --- |
+| AI-first start | [START_HERE.md](START_HERE.md) and [AGENTS.md](AGENTS.md) |
+| Stable Casual Builder / Tester | [Builder v7.4](prompts/casual/builder/stable/MTG_Deck_Builder_v7.4_full.md) and [Tester v3.4.2](prompts/casual/tester/MTG_Deck_Tester_v3.4.2_full.md) |
+| Public Validator | `validator/MTG_Deck_Validator_v1.1.1.py`, SHA-256 `58b1015c1138b6bb5bfb2b49cd1762d56ea9cc4687d9e87314f2124570a0a5fd` |
+| Gateway source profile | [Current source compatibility / pins](docs/AGENT_SOURCE_COMPATIBILITY_P4.md); verify actual local bytes |
+| Optional AI-led controller | [Workflow MVP](docs/AGENT_WORKFLOW_MVP.md); merged into public main, still experimental |
+| Draft compact prompts | PR #3 is experimental, **not activated**, and not part of `main` |
+| Separate ChatGPT Project | Project v1.6 has independently managed sources and hashes; GitHub changes do not update it |
+
+**Important:** The Validator pin above identifies the current public source; older hashes elsewhere in this file describe **historical private-beta or rollback sources**, not alternative values for today's public `main`. A passed structural check does not establish comprehensive MTG legality, strategic superiority or gameplay results.
+
+## Historical project and private-beta record (retained for traceability)
+
 **Public lifecycle:** `PUBLIC_TEST_PREVIEW`. The public repository supports experimental source testing and the Casual Builder/Validator/Tester workflow. See [public testing](PUBLIC_TESTING.md), [verification evidence](docs/PUBLIC_PREVIEW_AUDIT.md), and the [active Gateway source pins](docs/AGENT_SOURCE_COMPATIBILITY_P4.md). The audit remediation targets the public preview. Its tests establish only the coverage recorded in the verification evidence.
 
 **Private history:** Casual Private Beta v0.2 was approved for scoped private use with `PASS_WITH_LIMITATIONS`. The following sections preserve that decision and its rollback context. The [private release record](docs/releases/CASUAL_PRIVATE_BETA_v0.2_2026-11-01.md) applies to the historical private source. [ChatGPT Project v1.6](docs/CHATGPT_PROJECT_PRIVATE_BETA_SETUP.md) is a separate environment.
