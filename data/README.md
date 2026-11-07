@@ -17,9 +17,14 @@ proposes a reviewable pull request containing only:
   URL, official checksum URL, version, SHA-256, verification time, and record counts
 - The updated digest for that pointer in `SHA256SUMS.txt`
 
-The pointer is created on the **first successful run after activation**, once
-the generated pull request is merged. No fictitious digest is supplied before
-that happens. An unchanged Sunday check produces no new commit or PR.
+The first verified pointer was merged through PR #10. An unchanged Sunday
+check produces no new commit or PR. The workflow also refreshes `origin/main`
+before preparing a branch and again before proposing its PR. If another
+maintainer has already merged the same version and hash, a delayed job exits
+successfully without trying to create a duplicate PR. A verification superseded
+by newer accepted metadata on `main` is likewise not published.
+The verification timestamp comes from the verification job, not a delayed
+publication job.
 
 **Important:** `https://mtgjson.com/api/v5/AtomicCards.json.gz` is a mutable
 `latest` URL, not an immutable version-specific download. A pointer records
@@ -30,9 +35,9 @@ mismatch. For newly downloaded latest data, check MTGJSON's official
 `.sha256` file as well; the weekly pointer is an audit record, not a
 replacement for live checksum verification.
 
-The Gateway's existing pinned **slim** test Oracle profile is unchanged by
-this metadata-only workflow. Supporting verified **full AtomicCards** in the
-real-collection Gateway is a separate runtime integration task.
+The Gateway retains its frozen **slim** test profile, while production
+runtime setup separately supports the verified official **full AtomicCards**
+database. The weekly pointer does not replace live upstream checksums.
 
 **Permission prerequisite:** GitHub may require enabling
 Settings → Actions → General → **Allow GitHub Actions to create and approve
