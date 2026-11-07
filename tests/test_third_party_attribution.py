@@ -66,7 +66,9 @@ class AttributionIntegrityTests(unittest.TestCase):
             self.assertNotIn("gh release create", content)
             self.assertNotIn("gh release download", content)
             self.assertNotIn("gh release upload", content)
-            self.assertNotIn("actions/upload-artifact", content)
+        # Forge smoke may archive its own synthetic test logs. AtomicCards may
+        # never be uploaded as a workflow artifact by the MTGJSON job.
+        self.assertNotIn("actions/upload-artifact", mtgjson)
         for content in (forge, smoke):
             self.assertNotIn("contents: write", content)
         # Verification stays read-only. The ONLY permission exception is a
