@@ -4,6 +4,10 @@ AI Deckbuilding Tool is a free, open-source toolkit for AI-assisted Magic: The G
 
 **Status** `PUBLIC_TEST_PREVIEW`. The primary workflow is Casual 60+ card deckbuilding. The Agent Gateway, Forge and Commander Spellbook integrations are experimental. See [project status](PROJECT_STATUS.md), [public testing](PUBLIC_TESTING.md), and the [publication checklist](docs/PUBLIC_RELEASE_CHECKLIST.md).
 
+## Current AI host support
+
+**AI host compatibility (November 2026): ChatGPT-first public test preview.** ChatGPT is the primary host evaluated for the chat-link and collection-CSV onboarding path. Other AI assistants are **not yet verified or officially supported for the full tool workflow**. Some can read the instructions or propose decks, but these tests did not establish cross-agent, end-to-end Python Gateway/Validator execution. **Even on ChatGPT, a working local checkout, verified Oracle data and actual Validator execution are not guaranteed by sharing a link.** Never present an AI-authored deck as validated without real tool results.
+
 ## Start with an AI (recommended)
 
 Give an AI assistant this repository URL or the dedicated [chat-first starter](START_HERE.md). The AI should read the onboarding instructions and **ask for your current card collection CSV** (`Name,Quantity`) if it has not already been provided. The AI builds and reasons about the deck; Python tools support verification.
