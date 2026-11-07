@@ -4,6 +4,8 @@
 
 **Current public scope:** `PUBLIC_TEST_PREVIEW` for the Casual workflow. Private beta v0.2 acceptance is historical. Stable Builder v7.4 and Tester v3.4.2 are prompts, **not autonomous Python programs**. Swap Advisor work remains separate and on hold. MTG-AIO is a separate future, non-AI project.
 
+**AI host support:** ChatGPT-first public test preview. Other AI agents have not yet demonstrated supported end-to-end tool execution; instruction-reading and deck-proposal behavior alone are insufficient. This is not a claim that only ChatGPT can read the project, nor that ChatGPT automatically executes Python validation.
+
 **Chat-first entry:** When a user provides only the GitHub link or asks an AI to use this repository, begin with [START_HERE.md](START_HERE.md). Ask for the current collection CSV (`Name,Quantity`) only if it is not already accessible and confirmed for this run. Keep setup details behind an actual capability check; a repository link does not grant local execution. The AI selects all cards and strategy; Python tools verify evidence.
 
 ## A new agent must follow this order
