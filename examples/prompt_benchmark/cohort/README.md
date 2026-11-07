@@ -24,3 +24,5 @@ Each JSONL record contains a complete synthetic answer, fixture/deck digests, an
 
 - Builder: [stable B01–B07](builder-stable-01.jsonl), [stable B08–B14](builder-stable-02.jsonl), [candidate B01–B07](builder-candidate-01.jsonl), [candidate B08–B14](builder-candidate-02.jsonl).
 - Tester: [stable T01–T04](tester-stable.jsonl), [candidate T01–T04](tester-candidate.jsonl).
+
+The [2026-11-07 follow-up](../../../docs/PROMPT_FOLLOWUP_2026-11-07.md) adjudicates T02/T03 against the active specification, records archived response-word costs, and specifies a smaller blind diagnostic repeat. Candidate wording changed after this cohort; none of these archived answers evaluates the revised wording. Historical evidence stays pinned to its original runtime.
