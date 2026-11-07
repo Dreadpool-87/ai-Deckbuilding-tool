@@ -4,6 +4,8 @@
 
 **Current public scope:** `PUBLIC_TEST_PREVIEW` for the Casual workflow. Private beta v0.2 acceptance is historical. Stable Builder v7.4 and Tester v3.4.2 are prompts, **not autonomous Python programs**. Swap Advisor work remains separate and on hold. MTG-AIO is a separate future, non-AI project.
 
+**Chat-first entry:** When a user provides only the GitHub link or asks an AI to use this repository, begin with [START_HERE.md](START_HERE.md). Ask for the current collection CSV (`Name,Quantity`) only if it is not already accessible and confirmed for this run. Keep setup details behind an actual capability check; a repository link does not grant local execution. The AI selects all cards and strategy; Python tools verify evidence.
+
 ## A new agent must follow this order
 
 1. **Check capabilities.** Confirm Python and actual access to local scripts, card data, active collection, and output folder. An attachment, Project Source, link or GitHub file is not proof of executable runtime access. Label an unrun step `NOT_EXECUTED`.
