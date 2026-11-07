@@ -18,6 +18,8 @@
 8. **Treat swaps as advice.** Do not present an unverified AI idea or a bounded Swap Advisor role witness as a proven `SWAP`. Mention pros, cons, prerequisites and unresolved assumptions; no automatic edits (`automatic_swap_authorized=false`). Swap Advisor integration requires a separate acceptance and integration approval.
 9. **Report concisely.** Give the deck(s), source/collection status, validation result, strategic rationale, known limitations and, if supported, proposed changes with trade-offs. Distinguish `FACT`, `DERIVATION` and `HYPOTHESIS`. Never claim to have executed a tool without its real output.
 
+**Required validation attempt in Python-capable environments:** Once a candidate is written and the inputs are locally available, run `python -m ai_deckbuilding_tool validate --oracle <pinned-slim-oracle> --collection <current-run-csv> --collection-confirmed --deck <ai-authored-deck>`. This first executes Gateway preflight, then the pinned Validator; use its actual JSON status, never an invented PASS. If validation fails, revise and rerun. If source files, pinned Oracle or execution access are missing, report the exact blocker and `NOT_EXECUTED`. This CLI does not choose cards, download Oracle data or bypass host permissions. See [the quickstart](docs/AGENT_QUICKSTART.md#automatic-preflight-and-validation-entry-point).
+
 ## Runtime map
 
 | Need | Maintained entry | Meaning |
