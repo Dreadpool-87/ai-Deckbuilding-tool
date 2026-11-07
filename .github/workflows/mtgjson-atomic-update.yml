@@ -98,11 +98,11 @@ jobs:
             git fetch --no-tags origin main >/dev/null || return 3
             if git cat-file -e 'refs/remotes/origin/main:data/mtgjson_atomic_latest.json' 2>/dev/null; then
               git show 'refs/remotes/origin/main:data/mtgjson_atomic_latest.json' > "$RUNNER_TEMP/current-main-pointer.json" || return 3
-              python scripts/check_mtgjson_pointer_pr.py \\
+              python scripts/check_mtgjson_pointer_pr.py \
                 --proposed data/mtgjson_atomic_latest.json \\
                 --current-main "$RUNNER_TEMP/current-main-pointer.json" || return 3
             else
-              python scripts/check_mtgjson_pointer_pr.py \\
+              python scripts/check_mtgjson_pointer_pr.py \
                 --proposed data/mtgjson_atomic_latest.json || return 3
             fi
           }
