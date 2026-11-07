@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline MTG deck validator v1.1.1 (Python 3.9+, only the standard library).
+"""Offline MTG deck validator v1.1.1 (tested on Python 3.12 and 3.13).
 
 Checks the *submitted decklist* against a collection CSV and a local MTGJSON
 AtomicCards JSON/JSON.GZ database. No network access, no MTG gameplay engine.
@@ -18,6 +18,7 @@ Usage: python validator/MTG_Deck_Validator_v1.1.1.py --help
 import argparse
 import csv
 import gzip
+import importlib.util
 import json
 import math
 import re
@@ -25,6 +26,14 @@ import sys
 from collections import Counter
 from fractions import Fraction
 from pathlib import Path
+
+# Load only the adjacent or checkout-local helper, including in isolated CLI mode.
+_identity_path = Path(__file__).resolve().with_name('card_identity.py')
+if not _identity_path.is_file():
+    _identity_path = _identity_path.parent.parent / 'tools' / _identity_path.name
+_identity_spec = importlib.util.spec_from_file_location('mtg_card_identity', _identity_path)
+_identity = importlib.util.module_from_spec(_identity_spec)
+_identity_spec.loader.exec_module(_identity)
 
 STANDARD_BASICS = frozenset({
     'Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Wastes',
@@ -68,7 +77,7 @@ def read_collection(path):
                 name, value = row[name_index].strip(), row[quantity_index].strip()
                 if not name:
                     raise ValueError('Collection CSV line %d: missing Name' % line)
-                if not re.fullmatch(r'\d+', value):
+                if not re.fullmatch(r'[0-9]+', value):
                     raise ValueError('Collection CSV line %d: invalid Quantity' % line)
                 try:
                     owned[name] += int(value)
@@ -83,7 +92,7 @@ def read_collection(path):
 def read_oracle(path):
     opener = gzip.open if str(path).lower().endswith('.gz') else open
     with opener(path, 'rt', encoding='utf-8') as handle:
-        raw = json.load(handle)
+        raw = json.load(handle, object_pairs_hook=_identity.reject_duplicate_oracle_keys)
     if not isinstance(raw, dict):
         raise ValueError('MTGJSON root must be an object')
     data = raw.get('data', raw)
@@ -142,13 +151,71 @@ def exact_land_probability(deck_size, physical_lands, draws=7, low=2, high=5):
 
 def field_signature(entry):
     """Facts required by structural audit, independent of printing."""
+    def normalized(field):
+        value = entry.get(field)
+        if isinstance(value, list) and all(isinstance(item, str) for item in value):
+            return tuple(sorted(value))
+        return value
+
     skills = entry.get('leadershipSkills')
     commander_skill = skills.get('commander') if isinstance(skills, dict) else None
-    return (entry.get('manaValue'), tuple(sorted(entry.get('types') or [])),
-            tuple(sorted(entry.get('supertypes') or [])),
-            tuple(sorted(entry.get('colorIdentity') or [])),
-            entry.get('manaCost'), commander_skill)
+    return (entry.get('manaValue'), normalized('types'), normalized('supertypes'),
+            normalized('colorIdentity'), entry.get('manaCost'), commander_skill)
 
+
+def project_multiface(name, variants):
+    """Select the front or combine split faces only when required facts agree."""
+    pair = _identity.face_pair(name, variants)
+    if pair is None:
+        return variants, 'unsupported or incomplete face/layout metadata'
+    front, back = pair
+    layout = front[0]['layout']
+
+    def valid_mv(value):
+        return (type(value) in (int, float) and math.isfinite(value)
+                and value >= 0 and int(value) == value)
+
+    def usable(face):
+        types = face.get('types')
+        supertypes = face.get('supertypes', [])
+        skills = face.get('leadershipSkills', {})
+        cost = face.get('manaCost')
+        return (identity_valid(face) and isinstance(types, list) and bool(types)
+                and all(isinstance(t, str) for t in types)
+                and isinstance(supertypes, list) and all(isinstance(t, str) for t in supertypes)
+                and isinstance(skills, dict)
+                and ('commander' not in skills or type(skills['commander']) is bool)
+                and valid_mv(face.get('manaValue')) and valid_mv(face.get('faceManaValue'))
+                and (cost is None or (isinstance(cost, str) and bool(cost.strip()))))
+
+    if not all(usable(face) for face in variants):
+        return variants, 'missing or invalid structural face fields'
+    for side in pair:
+        if any(field_signature(face) != field_signature(side[0]) or
+               face.get('faceManaValue') != side[0].get('faceManaValue') for face in side):
+            return variants, 'conflicting structural data for the same side'
+    a, b = front[0], back[0]
+    if set(a['colorIdentity']) != set(b['colorIdentity']):
+        return variants, 'conflicting card color identity across sides'
+    if layout != 'modal_dfc' and a['manaValue'] != b['manaValue']:
+        return variants, 'conflicting shared mana value across sides'
+    if layout not in {'split', 'aftermath'}:
+        if a.get('faceManaValue') != a['manaValue']:
+            return variants, 'front face and card mana values differ or are missing'
+        if a.get('manaCost') is None and 'Land' not in a['types']:
+            return variants, 'missing front-face cost'
+        return front, None
+
+    face_values = [face.get('faceManaValue') for face in (a, b)]
+    combined_types = set(a['types']) | set(b['types'])
+    if (sum(face_values) != a['manaValue']
+            or not combined_types <= {'Instant', 'Sorcery', 'Kindred'}
+            or any(not set(face['types']) & {'Instant', 'Sorcery'} or
+                   not face.get('manaCost') for face in (a, b))):
+        return variants, 'unsupported split types, mana values, or printed costs'
+    return [dict(a, types=sorted(combined_types), supertypes=[],
+                 leadershipSkills={'commander': False},
+                 manaCost=f"{a['manaCost']} // {b['manaCost']}")], None
 
 
 def resolve_prepare_variants(name, variants):
@@ -320,11 +387,20 @@ def validate(owned, database, deck, mode='casual', commander=None,
     uncertainties = []
     warnings = []
     checks = {}
-    # Ownership matches canonical Oracle deck names without case-sensitive CSV spelling.
-    # Preserve the supplied inventory and sum differently cased printing rows.
-    owned_by_name = Counter()
-    for owned_name, owned_quantity in owned.items():
-        owned_by_name[owned_name.casefold()] += owned_quantity
+    verified, possible = _identity.card_name_index(database)
+    canonical_deck = Counter()
+    identity_findings = {}
+    for name, quantity in deck.items():
+        status, canonical = _identity.physical_name(name, database, verified, possible)
+        if status != 'EXACT_MATCH':
+            identity_findings[name] = {'status': status, 'canonical_name': canonical}
+        canonical_deck[canonical or name] += quantity
+    deck = canonical_deck
+    if commander:
+        _, canonical = _identity.physical_name(commander, database, verified, possible)
+        commander = canonical or commander
+    owned_by_name, ownership_coverage = _identity.resolve_collection(
+        owned, database, verified, possible)
     count = sum(deck.values())
     checks['deck_parsing'] = 'FAIL' if parse_errors else 'PASS'
 
@@ -373,11 +449,11 @@ def validate(owned, database, deck, mode='casual', commander=None,
     prepare_faces_unverified = {}
 
     for name, quantity in sorted(deck.items()):
-        raw = database.get(name)
+        finding = identity_findings.get(name)
+        raw = (None if finding and finding['canonical_name'] is None
+               else database.get(name))
         if raw is None:
             unresolved.append(name)
-            if quantity > owned_by_name.get(name.casefold(), 0):
-                insufficient.append({'card': name, 'needed': quantity, 'owned': owned_by_name.get(name.casefold(), 0)})
             continue
         variants = raw if isinstance(raw, list) else [raw]
         if not variants or not all(isinstance(v, dict) for v in variants):
@@ -392,6 +468,12 @@ def validate(owned, database, deck, mode='casual', commander=None,
             uncertainties.append('Prepare layout not safely resolved for %s: %s' % (name, prepare_error))
         if prepare_metadata is not None:
             prepare_faces_verified[name] = prepare_metadata
+        if not prepare_error and prepare_metadata is None and '//' in name:
+            variants, face_error = project_multiface(name, variants)
+            if face_error:
+                ambiguous.append(name)
+                uncertainties.append('Multiface layout not safely resolved for %s: %s' % (name, face_error))
+                continue
         card = variants[0]
         if any(v.get('name') != name for v in variants):
             unresolved.append(name)
@@ -403,18 +485,20 @@ def validate(owned, database, deck, mode='casual', commander=None,
         if not isinstance(raw_types, list) or not raw_types or not all(isinstance(t, str) for t in raw_types):
             missing_types = True
             uncertainties.append('Missing/invalid types for %s' % name)
-        types = set(raw_types) if isinstance(raw_types, list) else set()
+        types = {typ for typ in raw_types if isinstance(typ, str)} if isinstance(raw_types, list) else set()
         basic_states = [basic_land_status(name, variant) for variant in variants]
         basic_unlimited = all(state is True for state in basic_states)
         basic_ruled_out = all(state is False for state in basic_states)
-        if not basic_unlimited and quantity > owned_by_name.get(name.casefold(), 0):
+        if name in ambiguous:
+            ownership_uncertain = limit_uncertain = True
+        if name not in ambiguous and not basic_unlimited and quantity > owned_by_name.get(name, 0):
             if basic_ruled_out:
-                insufficient.append({'card': name, 'needed': quantity, 'owned': owned_by_name.get(name.casefold(), 0)})
+                insufficient.append({'card': name, 'needed': quantity, 'owned': owned_by_name.get(name, 0)})
             else:
                 ownership_uncertain = True
                 uncertainties.append('Basic-land ownership exemption uncertain for %s' % name)
         limit = 1 if mode == 'commander' else 4
-        if not basic_unlimited and quantity > limit:
+        if name not in ambiguous and not basic_unlimited and quantity > limit:
             if basic_ruled_out:
                 exception = (casual_copy_exception(name, variants)
                              if mode == 'casual' else 'ORDINARY')
@@ -458,10 +542,10 @@ def validate(owned, database, deck, mode='casual', commander=None,
         uncertainties.append('Conflicting MTGJSON variants for: %s' % ', '.join(ambiguous))
     if insufficient:
         failures.append('Not enough owned copies: %s' % json.dumps(insufficient, ensure_ascii=False))
-    checks['ownership'] = 'FAIL' if insufficient else ('UNVERIFIED' if unresolved or ownership_uncertain else 'PASS')
+    checks['ownership'] = 'FAIL' if insufficient else ('UNVERIFIED' if unresolved or ambiguous or ownership_uncertain else 'PASS')
     if over_limit:
         failures.append('Copy-limit violations: %s' % json.dumps(over_limit, ensure_ascii=False))
-    checks['copy_limit'] = 'FAIL' if over_limit else ('UNVERIFIED' if unresolved or limit_uncertain else 'PASS')
+    checks['copy_limit'] = 'FAIL' if over_limit else ('UNVERIFIED' if unresolved or ambiguous or limit_uncertain else 'PASS')
     checks['card_types'] = 'PASS' if not unresolved and not ambiguous and not missing_types else 'UNVERIFIED'
     checks['mana_curve'] = 'PASS' if not unresolved and not ambiguous and not missing_types and not missing_mana_value else 'UNVERIFIED'
     # Reusable arithmetic for Builder and Tester. No rules, casting, or gameplay claim.
@@ -503,18 +587,21 @@ def validate(owned, database, deck, mode='casual', commander=None,
             checks['commander_eligibility'] = 'UNVERIFIED'
         else:
             lead = cards_resolved[commander]
-            skills = lead.get('leadershipSkills')
-            skills = skills if isinstance(skills, dict) else {}
-            is_legendary_creature = ('Legendary' in (lead.get('supertypes') or []) and
-                                     'Creature' in (lead.get('types') or []))
-            if commander in ambiguous or not isinstance(lead.get('types'), list):
+            skills = lead.get('leadershipSkills', {})
+            lead_types = lead.get('types')
+            lead_supertypes = lead.get('supertypes', [])
+            if (commander in ambiguous or not isinstance(lead_types, list)
+                    or not isinstance(lead_supertypes, list)
+                    or not all(isinstance(t, str) for t in lead_supertypes + lead_types)
+                    or not isinstance(skills, dict)
+                    or ('commander' in skills and type(skills['commander']) is not bool)):
                 uncertainties.append('Commander eligibility has incomplete/conflicting data for %s' % commander)
                 checks['commander_eligibility'] = 'UNVERIFIED'
-            elif skills.get('commander') is True or is_legendary_creature:
-                checks['commander_eligibility'] = 'PASS_BASIC_RULE'
             elif skills.get('commander') is False:
                 failures.append('%s is not eligible as a single Commander according to loaded data' % commander)
                 checks['commander_eligibility'] = 'FAIL'
+            elif skills.get('commander') is True or ('Legendary' in lead_supertypes and 'Creature' in lead_types):
+                checks['commander_eligibility'] = 'PASS_BASIC_RULE'
             else:
                 uncertainties.append('Commander eligibility cannot be established for %s' % commander)
                 checks['commander_eligibility'] = 'UNVERIFIED'
@@ -557,8 +644,8 @@ def validate(owned, database, deck, mode='casual', commander=None,
     return {
         'status': 'FAIL' if failures else ('UNVERIFIED' if uncertainties else 'PASS_WITH_LIMITATIONS'),
         'mode': mode, 'deck_cards': count, 'unique_card_names': len(deck),
-        'lands_physical': land_count if not unresolved and not missing_types else None,
-        'nonlands': count - land_count if not unresolved and not missing_types else None,
+        'lands_physical': land_count if not unresolved and not ambiguous and not missing_types else None,
+        'nonlands': count - land_count if not unresolved and not ambiguous and not missing_types else None,
         'card_types_primary_exclusive': {typ: primary[typ] for typ in PRIMARY_TYPES if primary[typ]},
         'card_types_overlapping': {typ: overlap[typ] for typ in TYPES if overlap[typ]},
         'mana_curve_nonlands': {str(k): curve[k] for k in sorted(curve)},
@@ -576,6 +663,8 @@ def validate(owned, database, deck, mode='casual', commander=None,
             'percentage': round(float(probability)*100, 6) if probability is not None else None,
             'assumptions': 'uniform random 7-card hand, no mulligan, physical lands only',
         },
+        'identity_findings': identity_findings,
+        'collection_coverage': ownership_coverage,
         'checks': checks, 'failures': failures, 'uncertainties': uncertainties,
         'warnings': warnings,
         'limitations': ['No gameplay/winrate/synergy verification',

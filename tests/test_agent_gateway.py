@@ -595,6 +595,27 @@ class GatewayTests(unittest.TestCase):
         self.assertFalse(report["executed"])
         self.assertEqual(report["reason_codes"], ["CARD_SEARCH_SHA256_MISMATCH"])
 
+    def test_modified_identity_helper_is_blocked_before_subprocess(self):
+        import contextlib
+        import io
+        import runpy
+        gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")
+        root_globals = gateway["_dispatch"].__globals__
+        candidate = self.dir / "unapproved-card-identity.py"
+        candidate.write_bytes((ROOT / "tools" / "card_identity.py").read_bytes() +
+                              b"\n# this must not run\n")
+        root_globals["CARD_IDENTITY"] = candidate
+        output = io.StringIO()
+        with self.mock_process(gateway, side_effect=AssertionError("spawned unapproved code")):
+            with contextlib.redirect_stdout(output):
+                code = gateway["main"](["discover", *map(str, self.common()),
+                                         "--theme", "Shock"])
+        report = json.loads(output.getvalue())
+        self.assertEqual(code, 2)
+        self.assertEqual(report["status"], "INPUT_ERROR")
+        self.assertFalse(report["executed"])
+        self.assertEqual(report["reason_codes"], ["CARD_IDENTITY_SHA256_MISMATCH"])
+
     def test_discover_executes_captured_code_even_when_original_is_swapped_at_launch(self):
         import runpy
         gateway = runpy.run_path(str(GATEWAY), run_name="test_gateway_import")

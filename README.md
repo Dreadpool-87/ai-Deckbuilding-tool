@@ -6,7 +6,7 @@ AI Deckbuilding Tool is a free, open-source toolkit for AI-assisted Magic: The G
 
 ## Get started
 
-Use Python 3.12 from a local checkout. The core tools use the standard library. To validate a deck, supply a local MTGJSON AtomicCards JSON or gzip file, a current collection CSV with `Name,Quantity` columns, and a UTF-8 decklist with entries like `4 Lightning Bolt`. Download and verify Oracle data separately using the [MTGJSON verification guide](docs/MTGJSON_Automated_Backup.md). Keep collection CSVs, private decks, and generated reports local.
+Use Python 3.12 or 3.13 from a local checkout. Run the [synthetic smoke test](docs/AGENT_QUICKSTART.md#synthetic-smoke-test) to check your setup. The core tools use the standard library. To validate a deck, supply a local MTGJSON AtomicCards JSON or gzip file, a current collection CSV with `Name,Quantity` columns, and a UTF-8 decklist with entries like `4 Lightning Bolt`. Download and verify Oracle data separately using the [MTGJSON verification guide](docs/MTGJSON_Automated_Backup.md). Keep collection CSVs, private decks, and generated reports local.
 
 1. Start with the [agent entry point](AGENTS.md) and [quickstart](docs/AGENT_QUICKSTART.md). Confirm the actual runtime and the collection for the current run.
 2. Find candidates with [Card Search](docs/CARD_SEARCH.md) and use [Casual Builder v7.4](prompts/casual/builder/stable/MTG_Deck_Builder_v7.4_full.md) in the host to construct a deck. Discovery roles and pair suggestions are heuristics.
@@ -22,6 +22,8 @@ python validator/MTG_Deck_Validator_v1.1.1.py \
 ```
 
 Omit `--exact-60` for decks larger than 60 cards. A result of `PASS_WITH_LIMITATIONS` means the implemented structural checks passed. Full rules legality, format banlists, castability, strategic strength, and win rates are outside those checks. The project does not edit decks or apply swaps automatically. [Forge](integrations/forge/README.md) supports separate experimental gameplay, while [Commander Spellbook](integrations/commander-spellbook/README.md) screens for combo ingredients.
+
+Use the [card naming and import guide](docs/MTG_Validator_Guide.md#physical-card-names-and-import) for aliases, disputed inventory labels and spaced `x` markers. Full AtomicCards was tested with synthetic ownership. The real-collection Gateway still requires its frozen slim dataset. AI prompt equivalence across models and the external Project Source migration are `NOT_VERIFIED`.
 
 ## Run the offline tests
 

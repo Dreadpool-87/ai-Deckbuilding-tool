@@ -4,24 +4,34 @@
 
 The active Validator reads `4 Lightning Bolt`, `4x Lightning Bolt`, `4× Lightning Bolt`, and `4×Lightning Bolt`. Put a space after an attached ASCII `x` or `X`. With a space after the quantity, the following text is the card name, so `4 Xenagos, God of Revels` preserves the initial X. Write `4x Lightning Bolt` when importing a list with a separated ASCII marker such as `4 x Lightning Bolt`.
 
-**One reusable Python file:** `validator/MTG_Deck_Validator_v1.1.py` in this repository.
+**Executable:** `validator/MTG_Deck_Validator_v1.1.1.py` in this repository.
 
-This is an independent **offline** utility for checking hard constraints in a Magic: The Gathering decklist. It runs on Python 3.9+ and requires only the standard library. No GitHub account, external API, or API key is necessary.
+This is an independent **offline** utility for checking hard constraints in a Magic: The Gathering decklist. It is tested on Python 3.12 and 3.13 and requires only the standard library. Keep the checkout layout or place the matching `card_identity.py` beside the public Validator. No GitHub account, external API, or API key is necessary.
 
 ## Required files
 
-1. `validator/MTG_Deck_Validator_v1.1.py` (or the same standalone file in your local project directory).
-2. Your **active** collection as a CSV containing at least `Name` and `Quantity` (for example, `MTG_Mastercollection_M19_M20_M21_plus_Sorin_Chandra(2).csv`). The validator never silently merges multiple collections.
+1. `validator/MTG_Deck_Validator_v1.1.1.py` and its matching `tools/card_identity.py`.
+2. Your **active** collection as a CSV containing at least `Name` and `Quantity` (for example, `current_collection.csv`). The validator never silently merges multiple collections.
 3. A local MTGJSON `AtomicCards` database, `.json` or `.json.gz` (for example, `AtomicCards_slim_v2.json.gz`). MTGJSON supplies **card facts**, not evidence of ownership.
 4. Your final decklist as a **UTF-8 `.txt` file**, one quantity/name entry per line, such as `4 Shock`, `2 Banefire`, `21 Mountain`. Headings such as `Creatures (26)` are ignored. Unrecognized lines or sideboard sections cause `FAIL`; they are not silently accepted.
+
+## Physical-card names and import
+
+Use exact Oracle names for ordinary deck entries. For a supported multiface record, use the combined AtomicCards name or a corroborated front alias such as `Delver of Secrets`. A reverse or alternate face alone is discovery input only. Front and combined deck entries aggregate for ownership, deck totals and copy limits. The same rules apply to the single Commander name, with additional eligibility and color-identity checks. Malformed metadata, ambiguous names, and unsupported layouts including meld and reversible cards block verification.
+
+CSV inventory labels are case-insensitive. Repeated rows with the same label can represent different owned printings. Mixed front and combined inventory labels are quarantined because the inventory cannot establish whether they list the same copies. Reconcile and confirm the inventory before retrying. The Validator reports non-exact identity findings and unresolved collection coverage. Its selected-deck checks can still pass when an unrelated collection row is unresolved.
+
+Transform, modal DFC, Adventure and flip use the front record for printed costs and physical land counts. Split/aftermath use combined printed mana value and display the two costs. Prepare retains its separate two-face integrity audit. Incomplete slim multiface data can require a full dataset. The pinned Gateway real-collection profile still uses its separately managed slim dataset.
+
+Both Validator and Spellbook accept `4 Lightning Bolt`, `4x Lightning Bolt`, `4× Lightning Bolt` and `4×Lightning Bolt`. With a separated ASCII marker, `4 x Lightning Bolt` means quantity 4 and the literal name `x Lightning Bolt`. If your exporter emits a separated marker, configure it to output a supported form or inspect and edit the line explicitly. The parsers preserve names including `X` and `Xenagos, God of Revels`.
 
 ## Casual 60-card Constructed
 
 Put your files in an accessible local directory, open a terminal, and run:
 
 ```bash
-python validator/MTG_Deck_Validator_v1.1.py \
-  --collection "MTG_Mastercollection_M19_M20_M21_plus_Sorin_Chandra(2).csv" \
+python validator/MTG_Deck_Validator_v1.1.1.py \
+  --collection "current_collection.csv" \
   --oracle "AtomicCards_slim_v2.json.gz" \
   --deck "examples/Synthetic_Red_A.txt" \
   --mode casual --exact-60 \
@@ -35,7 +45,7 @@ Omit `--exact-60` if you want to permit casual Constructed decks with **at least
 ## Commander (simple single-commander decks)
 
 ```bash
-python validator/MTG_Deck_Validator_v1.1.py \
+python validator/MTG_Deck_Validator_v1.1.1.py \
   --collection "my_collection.csv" \
   --oracle "AtomicCards_slim_v2.json.gz" \
   --deck "my_commander_deck.txt" \
@@ -88,9 +98,9 @@ castability, mulligans, gameplay, or win rates.
 
 ## ChatGPT Projects
 
-Upload the `.py` validator as a **project file** alongside the current collection CSV and MTGJSON data. For a new build, upload or paste the exact final TXT decklist and request:
+Stage the public Validator and matching `card_identity.py` side by side in the executable runtime alongside the current collection CSV and MTGJSON data. For a new build, upload or paste the exact final TXT decklist and request:
 
-> Actually execute `MTG_Deck_Validator_v1.1.py` with Python using my active collection CSV, MTGJSON, and this decklist. For casual 60-card decks, use `--exact-60`. Return the actual output/JSON report, errors, and `NOT_CHECKED` categories. If code execution is unavailable, report `NOT EXECUTED` rather than inventing a PASS.
+> Actually execute `MTG_Deck_Validator_v1.1.1.py` with Python using my active collection CSV, MTGJSON, and this decklist. For casual 60-card decks, use `--exact-60`. Return the actual output/JSON report, errors, and `NOT_CHECKED` categories. If code execution is unavailable, report `NOT EXECUTED` rather than inventing a PASS.
 
 **Important:** Uploading a file alone does not execute Python. ChatGPT must have code execution available and actually run the program. The validator is independent of any Builder prompt and can also be used in a fresh chat.
 

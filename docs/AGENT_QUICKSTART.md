@@ -29,7 +29,7 @@ Read [P4 Source Compatibility](AGENT_SOURCE_COMPATIBILITY_P4.md) for the exact h
 
 ## Pinned execution and input snapshots
 
-The Gateway pins Card Search v0.3 by SHA-256, and `doctor` now reports `checks.card_search.pin_matches`. `discover` rejects modified Card Search bytes before execution. Both `discover` and `validate` stage SHA-checked code together with private snapshots of the Oracle/collection/deck inputs, run only against those snapshots, and clean them on exit. Rechecking the originals after execution may still yield `UNVERIFIED` if an original changed. No caller can replace the required code pin by a CLI parameter.
+The Gateway pins Card Search and its shared card identity helper by SHA-256, and `doctor` now reports `checks.card_search.pin_matches`. `discover` rejects modified Card Search bytes before execution. Both `discover` and `validate` stage SHA-checked code together with private snapshots of the Oracle/collection/deck inputs, run only against those snapshots, and clean them on exit. Rechecking the originals after execution may still yield `UNVERIFIED` if an original changed. No caller can replace the required code pin by a CLI parameter.
 
 **Consent:** `--collection-confirmed` is a caller declaration, not a verified signature or proof of ownership. Only set it after the user expressly confirms that collection **for this execution**. Synthetic test mode must not set it. Never infer consent from prior chats, prior collections or the Oracle. This change does not add authentication, strategy validation, an agent deployment or permission to merge.
 
@@ -90,5 +90,33 @@ Only add `--exact-60` when exactly 60 was required; Casual itself allows 60 or m
 
 Report `EXECUTED` vs `NOT_EXECUTED` for each actual tool call, the exact source context, validation status, and which strategic statements are hypotheses. If inputs are missing or invalid, return `INPUT_ERROR` / `UNVERIFIED` when appropriate; never quietly substitute a synthetic collection as real ownership.
 
-**Current boundary:** The Gateway workflow and source hardening passed independent synthetic acceptance. Real collections, the production Oracle bulk file, alternate Validator binaries and cross-agent portability remain outside that test scope. Swap Advisor work remains separate and on hold.
+**Current boundary:** The Gateway workflow and source hardening passed independent synthetic acceptance. Real collections, the pinned production slim Oracle, alternate Validator binaries and cross-agent portability remain outside that test scope. See [full AtomicCards smoke evidence](IDENTITY_RELIABILITY_AUDIT.md). Swap Advisor work remains separate and on hold.
 
+
+## Synthetic smoke test
+
+From a clean checkout with Python 3.12 or 3.13, run the following in a temporary directory created by the shell. Use Bash. These names and quantities are synthetic test inputs.
+
+```bash
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+cat > "$scratch/oracle.json" <<'JSON'
+{"data":{"Mountain":[{"name":"Mountain","types":["Land"],"supertypes":["Basic"],"colorIdentity":["R"],"manaValue":0}],"Fixture Bolt":[{"name":"Fixture Bolt","types":["Instant"],"colorIdentity":["R"],"manaCost":"{R}","manaValue":1,"text":"Fixture Bolt deals 2 damage to any target."}]}}
+JSON
+printf 'Name,Quantity\nFixture Bolt,5\n' > "$scratch/collection.csv"
+printf '56 Mountain\n4 Fixture Bolt\n' > "$scratch/deck.txt"
+oracle_pin=$(sha256sum "$scratch/oracle.json" | cut -d ' ' -f1)
+gateway() {
+  python tools/agent_gateway.py "$1" --oracle "$scratch/oracle.json" \
+    --oracle-sha256 "$oracle_pin" --collection "$scratch/collection.csv" \
+    --collection-scope synthetic "${@:2}"
+}
+
+python tools/agent_gateway.py doctor
+gateway discover --theme damage
+gateway validate --deck "$scratch/deck.txt" --exact-60
+printf '55 Mountain\n5 Fixture Bolt\n' > "$scratch/deck.txt"
+gateway validate --deck "$scratch/deck.txt" --exact-60
+```
+
+Expected results in order are `RUNTIME_COMPONENTS_PRESENT` (exit 0, downstream `NOT_EXECUTED`), `CANDIDATES_NOT_VALIDATED` (exit 0, child 0), `VALIDATED_WITH_LIMITATIONS` (exit 0, child 0), and `BLOCKED_INVALID_DECK` (exit 2, child 1). The last check isolates the copy limit because the synthetic inventory supplies five copies. The full upstream Oracle is allowed in synthetic mode with its exact file hash. A full upstream Oracle supplied to `doctor --oracle` will return `UNVERIFIED` unless its bytes match the frozen slim pin.

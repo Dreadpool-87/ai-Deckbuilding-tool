@@ -20,7 +20,7 @@
 | `casual60` | `--deck` | Requires exactly 60 cards; excludes all variants with `mustBeCommander` ingredients |
 | `collection` | `--collection` | Scans current Name,Quantity inventory; no deck legality claim and no commander |
 
-In `casual60` and `collection` modes, `--commander` and `--identity` are rejected. A Commander color identity is **not** a casual 60-card legality rule. For deck color restrictions and nonbasic copy limits, continue to use the existing Builder/Validator; the combo matcher does not repeat their duties. `collection` mode shares the *existing* CSV reader in `card_search.py`; keep both scripts in the same folder when uploading Project Sources.
+In `casual60` and `collection` modes, `--commander` and `--identity` are rejected. A Commander color identity is **not** a casual 60-card legality rule. For deck color restrictions and nonbasic copy limits, continue to use the existing Builder/Validator; the combo matcher does not repeat their duties. `collection` mode shares the *existing* CSV reader in `card_search.py`; keep the current analyzer, Card Search and its matching `card_identity.py` together when staging them for execution.
 
 The matcher accepts public, non-spoiler `OK` or `E` variants without unresolved template ingredients and checks exact card quantities case-insensitively. It reports candidate variants with all named ingredients present and variants missing exactly one **copy**. It conservatively skips candidates requiring a commander in non-Commander modes.
 
@@ -103,3 +103,5 @@ The temporary automated bulk-download step was removed after the successful chec
 ## Deck entry separators
 
 Use `4 Lightning Bolt`, `4x Lightning Bolt`, `4× Lightning Bolt`, or `4×Lightning Bolt`. An attached ASCII `x` or `X` requires a following space. After whitespace immediately following the quantity, the text is a card name. This preserves names such as `Xenagos, God of Revels`. Convert separated ASCII markers such as `4 x Lightning Bolt` to `4x Lightning Bolt` before import.
+
+The ingredient screen compares supplied names against the Spellbook export. Its optional Oracle-backed theme report uses shared physical-card collection resolution and reports absent and unverified labels separately. Ingredient counts alone establish no physical-card identity or ownership. The [quantity grammar](../../docs/MTG_Validator_Guide.md#physical-card-names-and-import) is shared with the Validator.
