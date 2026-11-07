@@ -3,13 +3,16 @@
 These tests verify real Gateway/Validator subprocess execution, not strategic
 deck quality and not a user-provided collection.
 """
+import contextlib
 import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -107,6 +110,20 @@ class OneCommandCliTests(unittest.TestCase):
         )
         self.assertEqual(code, 2)
         self.assertEqual(report["reason_codes"], ["SYNTHETIC_COLLECTION_CANNOT_BE_CONFIRMED"])
+        self.assertIsNone(report["gateway"])
+
+    def test_tampered_gateway_pin_prevents_any_execution(self):
+        from ai_deckbuilding_tool import __main__ as entry
+        output = io.StringIO()
+        with mock.patch.dict(entry.PINNED_CODE,
+                             {"tools/agent_gateway.py": "0" * 64}):
+            with contextlib.redirect_stdout(output):
+                code = entry.main(["doctor"])
+        report = json.loads(output.getvalue())
+        self.assertEqual(code, 3)
+        self.assertEqual(report["status"], "UNVERIFIED")
+        self.assertEqual(report["reason_codes"], ["LOCAL_CODE_SHA256_MISMATCH"])
+        self.assertIsNone(report["preflight"])
         self.assertIsNone(report["gateway"])
 
     def test_wrong_arguments_fail_with_machine_readable_status(self):
