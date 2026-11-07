@@ -22,11 +22,15 @@ MTGJSON is maintained by **Zach Halpern and contributors** and published under t
 
 ## Actual schedule and operation
 
-Workflow: [`.github/workflows/mtgjson-atomic-update.yml`](../.github/workflows/mtgjson-atomic-update.yml), displayed as **Verify upstream MTGJSON AtomicCards (no mirror)**. It runs on the first day of each month at 07:17 UTC, or via manual `workflow_dispatch`.
+Workflow: [`.github/workflows/mtgjson-atomic-update.yml`](../.github/workflows/mtgjson-atomic-update.yml), displayed as **Weekly MTGJSON AtomicCards verification and pointer proposal (no mirror)**. It runs **every Sunday at 07:17 UTC**, or via manual `workflow_dispatch`. GitHub Actions schedules can be delayed or disabled after inactivity.
 
-The workflow downloads `Meta.json`, the official SHA-256 checksum and `AtomicCards.json.gz` to **temporary GitHub Actions runner storage**. It verifies file size, digest, gzip/JSON structure, minimum card coverage and matching version metadata using [`scripts/update_mtgjson_atomic.py`](../scripts/update_mtgjson_atomic.py). The job summary records only the version, checksum and upstream URL.
+The read-only verification job downloads `Meta.json`, the official SHA-256 checksum and `AtomicCards.json.gz` to **temporary GitHub Actions runner storage**. It verifies file size, digest, gzip/JSON structure, minimum card coverage and matching version metadata using [`scripts/update_mtgjson_atomic.py`](../scripts/update_mtgjson_atomic.py). It also rechecks the official version and checksum **after** downloading and parsing the archive, rejecting a moving upstream snapshot.
 
-**No dataset, source file or license file is uploaded as a new Release asset or committed to this repository.** The job token uses `contents: read`. Scheduled jobs may be delayed; inspect Action history for errors. The workflow has not yet been live-executed in its newly revised verification-only form.
+Only the small verified manifest is passed to a separately permissioned metadata job. When the version or SHA-256 changes, it proposes a pull request containing [`data/mtgjson_atomic_latest.json`](../data/README.md) and its `SHA256SUMS.txt` digest. The pointer is created on the first successful run and remains unchanged when the verified version/hash is unchanged. Pull requests require human review; **the workflow never merges them automatically**. Creating PRs using `GITHUB_TOKEN` may require enabling **Allow GitHub Actions to create and approve pull requests** in repository Actions settings.
+
+**No card archive or bulk dataset is uploaded, committed, mirrored, or distributed by this workflow.** The URL in the pointer is the same official mutable `latest` URL; the recorded SHA-256 identifies only the verified snapshot. If MTGJSON updates again between Sunday checks, a fresh download may not match Sunday's digest. Runtime consumers must verify the downloaded bytes against the official upstream checksum, not silently assume the last recorded snapshot is still current. The existing pinned slim test Oracle remains unchanged until separately revised runtime support is approved.
+
+The updated weekly and automatic-PR workflow requires its first live run to establish execution evidence.
 
 ## Historical backup (private, not used by the current workflow)
 
