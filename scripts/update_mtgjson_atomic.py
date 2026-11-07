@@ -43,6 +43,15 @@ def validate_data(payload, version):
         raise ValueError("Archive and Meta.json versions differ")
     return len(payload["data"])
 
+def ensure_upstream_snapshot_unchanged(version, checksum):
+    """Never record a moving 'latest' URL if MTGJSON changed mid-download."""
+    latest = json.loads(fetch("Meta.json"))
+    latest_version = latest.get("data", {}).get("version") if isinstance(latest, dict) else None
+    latest_checksum = parse_checksum(fetch(ARCHIVE + ".sha256"))
+    if latest_version != version or latest_checksum != checksum:
+        raise ValueError("MTGJSON upstream changed during verification; retry on next run")
+
+
 def prepare(out):
     out.mkdir(parents=True, exist_ok=True)
     meta = json.loads(fetch("Meta.json"))
@@ -66,6 +75,7 @@ def prepare(out):
             raise ValueError("Download size/checksum verification failed")
         with gzip.open(path, "rt", encoding="utf-8") as stream:
             count = validate_data(json.load(stream), version)
+        ensure_upstream_snapshot_unchanged(version, checksum)
     except Exception:
         path.unlink(missing_ok=True)
         raise
