@@ -1,5 +1,9 @@
 # Quickstart for any Python-capable AI agent
 
+## Obtain executable sources
+
+Use a verified checkout, or follow [source recovery](AGENT_SOURCE_BOOTSTRAP.md) when shell GitHub access fails. The connector transport restores only allowlisted source files, checked against a manifest from one fixed commit. It contains no Oracle data or collection. An unavailable connector or blocked MTGJSON remains an explicit environment limitation.
+
 ## Automatic preflight and validation entry point
 
 Run from a local checkout with Python 3.12 or 3.13. No ChatGPT API, host path or proprietary SDK is required.

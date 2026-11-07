@@ -1,0 +1,25 @@
+{
+  "files": {
+    "AGENTS.md": "a853ef7cc7b3e25df0f4bf48873587fd8caad6b63af6340a0b1d67e9490bc30c",
+    "PROJECT_STATUS.md": "4d2fbd1ca354d366d12abdcce9643ef0b69cef84c3d26e9b2fc317f824047dd5",
+    "README.md": "66616f41eb5d82467ee09fd54e27588cd9fc97f97350c91c663d133ed24db037",
+    "START_HERE.md": "7f2d78e5aa6ce68c210cdd8ceb3bd1240a06f9fdf50cc07aba390c391e37c056",
+    "ai_deckbuilding_tool/__init__.py": "59fe24254cd679344e2bf8b5d4ca016d6f37a8b7cc1d60726fa747b8767e8969",
+    "ai_deckbuilding_tool/__main__.py": "c07a63ca4587e7ed6185819444a1de3da1dbcf38d178e94bd21aa449fcb2eb3e",
+    "ai_deckbuilding_tool/collection_import.py": "72eeefbadb861916dc3a21e1fecf3334a9a33da2bb7659b6192a0c28ae268d5f",
+    "docs/AGENT_QUICKSTART.md": "a41811e5b30114521239b5245e37476cd9f5e9147335e4fa42c9ea0974af905b",
+    "docs/AGENT_SOURCE_BOOTSTRAP.md": "cd7aaa63fa366f9866c9b67f7bc48fb4355d45ba8870b8cdb058dd820790b313",
+    "docs/AGENT_SOURCE_COMPATIBILITY_P4.md": "98ae0d5046d770592fb8b24f8705a6b12c9fec6e546514c0630b7d4e9c2db95f",
+    "docs/AGENT_WORKFLOW_MVP.md": "09ad14685201c57a0a2092f0d06f54d507ebf891d9e2513ccb4452a7be94c266",
+    "prompts/casual/builder/stable/MTG_Deck_Builder_v7.4_full.md": "7091722a2860896e3e9938be0be446f7e554cbe2b8e2676131bd559c767eb9db",
+    "prompts/casual/tester/MTG_Deck_Tester_v3.4.2_full.md": "a6623ab594552061199ea57bc235e929a38598025c67df11082df6dd41e96c4e",
+    "scripts/restore_agent_runtime.py": "31d88badbcc50164e8c81a526b8b34fedf651b79d9d61d18126892c0b7982934",
+    "tools/agent_gateway.py": "4382664a19d8f9ec0743980b2cd8128d2311099df29e9145e047156ccaee90a9",
+    "tools/agent_workflow.py": "26a8c97f4676e1db0b412c7c7ce495130b69b17c82ef88bb6a0e8d2228f42ad5",
+    "tools/atomic_runtime.py": "afe61cacf143a6197fd99f36fa388c73105ac55dbaac8abe30d883f9cf84fe59",
+    "tools/card_identity.py": "c4aa79b6f9341f9c0fe5d775b267ec7d4b5e371edf1dfcb99a9eaf644104d239",
+    "tools/card_search.py": "fc90135092476419ab3254c3142d1a8a9df6420e5ad80b54a7180b46822fbc82",
+    "validator/MTG_Deck_Validator_v1.1.1.py": "58b1015c1138b6bb5bfb2b49cd1762d56ea9cc4687d9e87314f2124570a0a5fd"
+  },
+  "schema_version": 1
+}

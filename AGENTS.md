@@ -10,7 +10,7 @@
 
 ## A new agent must follow this order
 
-1. **Check capabilities.** Confirm Python and actual access to local scripts, card data, active collection, and output folder. An attachment, Project Source, link or GitHub file is not proof of executable runtime access. Label an unrun step `NOT_EXECUTED`.
+1. **Check capabilities.** If `git clone` fails, follow [source recovery](docs/AGENT_SOURCE_BOOTSTRAP.md) before declaring execution blocked: use an available authorized connector and the commit-pinned `runtime/source_manifest.json` to restore exact source bytes. Do not confuse shell network failure with connector unavailability. Confirm Python and actual access to local scripts, card data, active collection, and output folder. An attachment, Project Source, link or GitHub file is not proof of executable runtime access. Label an unrun step `NOT_EXECUTED`.
 2. **Establish the correct sources.** Check the actual Oracle and applicable Validator file hashes in the runtime. Record the selected environment/version and full SHA-256. Never assume the same filename means the same bytes. MTGJSON/Oracle establishes card facts, **never ownership**.
 3. **Confirm collection for this run.** Only a collection explicitly provided/confirmed for the current execution permits owned-card claims. Never reuse ownership from chat memory, earlier exports or repository examples. No real collection: request authorization or use a visibly **synthetic** example.
 4. **Read the active specification.** For Casual deck construction use `prompts/casual/builder/stable/MTG_Deck_Builder_v7.4_full.md`; follow its constraints on requested strategy, colors, card counts, independent vs simultaneously assembled decks, and Basic-land policy. Read `PROJECT_STATUS.md` for the preview boundary.

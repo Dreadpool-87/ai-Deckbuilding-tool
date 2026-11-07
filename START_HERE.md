@@ -16,6 +16,10 @@ If the current collection is not already attached and explicitly confirmed for t
 
 Explain in plain language that real validation also requires executable Python tools and verified Oracle/MTGJSON card data. Check what the host can actually access. A GitHub URL or pasted prompt does **not** install the repository, mount files, provide Oracle data or grant code execution. If the required runtime or Oracle is missing, try the available permitted setup options; otherwise state the exact blocker and do not claim the workflow was executed.
 
+## If source download fails
+
+A failed `git clone` is not enough to conclude that the tools are unavailable. Before stopping, follow [source recovery](docs/AGENT_SOURCE_BOOTSTRAP.md): check an available authorized GitHub connector, resolve one commit, retrieve the small source manifest and exact files, and restore the runtime with hash verification. Then run normal setup and real validation. Do this for the user when the host supports it; do not ask the user to manually assemble code or calculate hashes. If no permitted route exposes exact executable bytes, report the attempted routes and `ENVIRONMENT_BLOCKED`.
+
 ## Required operating rules
 
 1. Confirm the **current-run** ownership source: only the CSV explicitly provided or confirmed for this run authorizes ownership claims. Never use prior chats, other repositories, card datasets or test fixtures as the user's collection. Keep personal collections and generated decklists out of public GitHub.
@@ -27,7 +31,7 @@ Explain in plain language that real validation also requires executable Python t
 
 ## After the AI creates a candidate deck
 
-**Python-capable agents: validation is the next required attempt, not an optional follow-up to offer the user.** Check the local checkout and run automatic setup. When they are, save the AI-authored deck to a private local file and run the one-command entry point:
+**Python-capable agents: validation is the next required attempt, not an optional follow-up to offer the user.** Obtain the local runtime using the recovery route if necessary, then run automatic setup. Once available, save the AI-authored deck to a private local file and run the one-command entry point:
 
 ```sh
 python -m ai_deckbuilding_tool validate --collection /private/CURRENT_COLLECTION.csv --collection-confirmed --deck /private/candidate.txt
