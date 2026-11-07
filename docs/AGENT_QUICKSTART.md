@@ -3,6 +3,22 @@
 **Status:** Public test preview. The primary workflow targets Casual 60+ card decks.
 Read the short `AGENTS.md` first. If the runtime or actual collection is unavailable, say so rather than presenting imaginary execution.
 
+## Automatic preflight and validation entry point
+
+From a **local checkout** with Python 3.12+ and the pinned slim Oracle, use the standard-library module to chain Gateway preflight and a real action. AI still decides the strategy and writes the candidate. These are **executable commands**, not proof that any particular chat host ran them:
+
+```sh
+python -m ai_deckbuilding_tool doctor --oracle /private/AtomicCards_slim_v2.json.gz
+python -m ai_deckbuilding_tool discover --oracle /private/AtomicCards_slim_v2.json.gz --collection /private/CURRENT_COLLECTION.csv --collection-confirmed --theme aggro
+python -m ai_deckbuilding_tool validate --oracle /private/AtomicCards_slim_v2.json.gz --collection /private/CURRENT_COLLECTION.csv --collection-confirmed --deck /private/candidate.txt
+```
+
+The CLI emits one JSON document containing a `preflight` Gateway receipt, the actual `gateway` receipt when the action ran, `validated` (true **only** for `VALIDATED_WITH_LIMITATIONS`), and `next_action`. Exit code 0 means readiness or a successful requested action; 2 means invalid input/deck; 3 means unverified or blocked readiness. `doctor` without `--oracle` runs a source-only check but returns exit 3 with `PINNED_ORACLE_NOT_SUPPLIED`.
+
+For synthetic offline testing only, add `--synthetic --oracle-sha256 <fixture-sha256>` to `discover` or `validate`, and do **not** pass `--collection-confirmed`. This never authorizes ownership claims for real collections. Real mode requires `--collection-confirmed` and the original pinned slim Oracle; the CLI does not change Gateway pins or silently accept a new MTGJSON dataset. To allow a Casual deck above 60 cards, pass `--allow-over-60` to validation. Otherwise validation requires exactly 60.
+
+**Host boundary:** This module does not clone GitHub, download/normalize card data, install Python, start itself from a URL or turn other AI systems into Python hosts. Agents should attempt execution when their host permits it and report an exact blocker otherwise. Do not send a private CSV to GitHub or a remote service. Failed checks must never be described as verified deck results.
+
 ## Experimental Gateway
 
 Use the standard-library dispatch interface when the current agent can execute local Python and all required inputs have actually been mounted. The following commands use the pinned slim Oracle and the public repository Validator.
