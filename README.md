@@ -4,6 +4,10 @@ AI Deckbuilding Tool is a free, open-source toolkit for AI-assisted Magic: The G
 
 **Status** `PUBLIC_TEST_PREVIEW`. The primary workflow is Casual 60+ card deckbuilding. The Agent Gateway, Forge and Commander Spellbook integrations are experimental. See [project status](PROJECT_STATUS.md), [public testing](PUBLIC_TESTING.md), and the [publication checklist](docs/PUBLIC_RELEASE_CHECKLIST.md).
 
+## Current AI host support
+
+**Capability-based public test preview.** Any AI host with a local checkout, Python 3.12/3.13 and permitted network access (or a verified local cache) can use the CLI. ChatGPT was the primary evaluated chat host; this is not certification that every chat platform can execute Python. Never claim deck validation without actual tool results.
+
 ## Start with an AI (recommended)
 
 Give an AI assistant this repository URL or the dedicated [chat-first starter](START_HERE.md). The AI should read the onboarding instructions and **ask for your current card collection CSV** (`Name,Quantity`) if it has not already been provided. The AI builds and reasons about the deck; Python tools support verification.
@@ -11,6 +15,21 @@ Give an AI assistant this repository URL or the dedicated [chat-first starter](S
 **For AI agents:** A message containing only this repository URL is a request to begin the onboarding in `START_HERE.md`. Ask the user directly for the missing collection; do not stop at a repository summary or request a separate implementation task.
 
 The link alone does not give an AI access to Python, source files or the verified Oracle dataset. If those cannot actually be loaded, the assistant must say so rather than inventing validation results. This is a public test preview, not a hosted one-click deckbuilding service.
+
+## MTGJSON data freshness (no redistribution)
+
+[Weekly AtomicCards verification](.github/workflows/mtgjson-atomic-update.yml) runs every **Sunday at 07:17 UTC**. It verifies the complete official MTGJSON download in temporary runner storage, and proposes a reviewed PR containing only [the official URL, version and SHA-256 pointer](data/README.md) when the version or digest changes. **No MTGJSON card archive is stored in Git history, GitHub Releases or Actions artifacts.** The official download URL is mutable; verify every downloaded archive against the current upstream checksum. This pointer does not yet activate full-AtomicCards support in the existing real-collection Gateway.
+## One-command validation for Python-capable AI hosts (experimental)
+
+After the AI has authored a deck, it should **attempt the real Validator before presenting a validated result**, instead of stopping at a manual card-count check. The new standard-library CLI automatically runs Gateway preflight and then delegates to the pinned Gateway. In a local checkout:
+
+```sh
+python -m ai_deckbuilding_tool setup
+python -m ai_deckbuilding_tool discover --collection /private/CURRENT_COLLECTION.csv --collection-confirmed --theme aggro
+python -m ai_deckbuilding_tool validate --collection /private/CURRENT_COLLECTION.csv --collection-confirmed --deck /private/ai_candidate.txt
+```
+
+Setup automatically verifies and caches official full MTGJSON AtomicCards. Discovery and validation invoke setup when Oracle arguments are omitted. Users do not manually prepare files or hashes. Actual execution permissions and current-run collection confirmation remain required. Invalid decks must be revised by the AI and revalidated. See [the quickstart](docs/AGENT_QUICKSTART.md#automatic-preflight-and-validation-entry-point).
 
 ## Get started
 
@@ -31,7 +50,7 @@ python validator/MTG_Deck_Validator_v1.1.1.py \
 
 Omit `--exact-60` for decks larger than 60 cards. A result of `PASS_WITH_LIMITATIONS` means the implemented structural checks passed. Full rules legality, format banlists, castability, strategic strength, and win rates are outside those checks. The project does not edit decks or apply swaps automatically. [Forge](integrations/forge/README.md) supports separate experimental gameplay, while [Commander Spellbook](integrations/commander-spellbook/README.md) screens for combo ingredients.
 
-Use the [card naming and import guide](docs/MTG_Validator_Guide.md#physical-card-names-and-import) for aliases, disputed inventory labels and spaced `x` markers. Full AtomicCards and the Gateway-pinned slim dataset were tested with synthetic ownership. The real-collection Gateway requires the frozen slim dataset. AI prompt equivalence across models and the external Project Source migration are `NOT_VERIFIED`.
+Use the [card naming and import guide](docs/MTG_Validator_Guide.md#physical-card-names-and-import) for aliases, disputed inventory labels and spaced `x` markers. Full AtomicCards and the Gateway-pinned slim dataset were tested with synthetic ownership. The Gateway accepts verified full snapshots with their local setup receipts; the frozen slim profile remains for reproducibility. AI prompt equivalence across models and the external Project Source migration are `NOT_VERIFIED`.
 
 An optional [experimental AI-led workflow controller](docs/AGENT_WORKFLOW_MVP.md) gates completion on actual Gateway evidence. The AI selects the deck and authors its strategic review.
 

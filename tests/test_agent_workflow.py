@@ -229,7 +229,7 @@ class WorkflowTests(unittest.TestCase):
     def test_validator_byte_replacement_stales_previously_verified_sources(self):
         # Isolate code copies so the test never edits maintained production tools.
         isolated = self.directory / "isolated-code"
-        for relative in ("tools/agent_gateway.py", "tools/card_search.py", "tools/card_identity.py",
+        for relative in ("tools/agent_gateway.py", "tools/atomic_runtime.py", "tools/card_search.py", "tools/card_identity.py",
                          "validator/MTG_Deck_Validator_v1.1.1.py"):
             target = isolated / relative
             target.parent.mkdir(parents=True, exist_ok=True)

@@ -13,7 +13,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 GATEWAY = ROOT / 'tools/agent_gateway.py'
-GATEWAY_PIN = '6422dfcb65c91e2a6197421515005b3b2f42805ead5f840218c12ae571be4534'
+GATEWAY_PIN = '4382664a19d8f9ec0743980b2cd8128d2311099df29e9145e047156ccaee90a9'
 STAGES = ('PREFLIGHT', 'SOURCES', 'COLLECTION', 'DISCOVERY', 'CANDIDATE',
           'VALIDATION', 'REVIEW', 'COMPLETE')
 LIMITATIONS = [
@@ -31,7 +31,7 @@ def digest(content):
 class Workflow:
     """One in-memory run. Restarted configuration must earn all evidence again."""
 
-    def __init__(self, oracle, oracle_sha256, collection, scope='synthetic', confirmed=False):
+    def __init__(self, oracle, oracle_sha256, collection, scope='synthetic', confirmed=False, oracle_receipt=None):
         if (scope not in ('synthetic', 'current-run-confirmed')
                 or type(confirmed) is not bool
                 or not isinstance(oracle_sha256, str)
@@ -42,6 +42,8 @@ class Workflow:
                                   oracle_sha256=oracle_sha256,
                                   collection=str(Path(collection).absolute()),
                                   scope=scope, confirmed=confirmed)
+        if oracle_receipt is not None:
+            self.configuration['oracle_receipt'] = str(Path(oracle_receipt).absolute())
         self.run_id = str(uuid.uuid4())
         self.stages = dict.fromkeys(STAGES, 'NOT_STARTED')
         self.evidence = {}
@@ -75,6 +77,9 @@ class Workflow:
                  'validator': ROOT / 'validator/MTG_Deck_Validator_v1.1.1.py',
                  'oracle': Path(self.configuration['oracle']),
                  'collection': Path(self.configuration['collection'])}
+        if self.configuration.get('oracle_receipt'):
+            paths['oracle_receipt'] = Path(self.configuration['oracle_receipt'])
+            paths['atomic_runtime'] = ROOT / 'tools/atomic_runtime.py'
         if self.deck is not None:
             paths['deck'] = self.deck
         return {key: g['_sha'](g['_file'](path, g['MAX_DATA'] if key == 'oracle'
@@ -144,6 +149,7 @@ class Workflow:
         self.evidence.pop(action, None)
         configuration = self.configuration
         expected_code = {'tools/agent_gateway.py': GATEWAY_PIN,
+                         'tools/atomic_runtime.py': g['ATOMIC_PIN'],
                          'tools/card_search.py': g['CARD_SEARCH_PIN'],
                          'tools/card_identity.py': g['IDENTITY_PIN'],
                          'validator/MTG_Deck_Validator_v1.1.1.py': g['VALIDATOR_PIN']}
@@ -158,6 +164,10 @@ class Workflow:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(content)
                 args = [sys.executable, '-I', '-S', '-B', str(stage / 'tools/agent_gateway.py'), action]
+                if configuration.get('oracle_receipt'):
+                    args += ['--oracle-receipt', configuration['oracle_receipt']]
+                    if action == 'doctor':
+                        args += ['--oracle', configuration['oracle']]
                 if action != 'doctor':
                     args += ['--oracle', configuration['oracle'], '--oracle-sha256',
                              configuration['oracle_sha256'], '--collection', configuration['collection'],
@@ -224,6 +234,7 @@ class Workflow:
                                tool_execution=report['tool_execution'], sources=sources,
                                output_sha256=digest(completed.stdout),
                                checks=child.get('checks', {}),
+                               oracle_provenance=report.get('oracle_provenance'),
                                collection_identity_status=coverage.get('identity_status'),
                                unresolved_name_count=coverage.get('unresolved_name_count', 0))
                 self.evidence[action] = receipt
@@ -259,7 +270,7 @@ class Workflow:
             self.snapshot = self._hashes()
             if self.snapshot['oracle'] != c['oracle_sha256']:
                 return self._block('ORACLE_SHA256_MISMATCH', 'SOURCES', 'UNVERIFIED')
-            if c['scope'] == 'current-run-confirmed' and c['oracle_sha256'] != self.support['ORACLE_PIN']:
+            if c['scope'] == 'current-run-confirmed' and c['oracle_sha256'] != self.support['ORACLE_PIN'] and not c.get('oracle_receipt'):
                 return self._block('ACTIVE_ORACLE_PIN_UNSUPPORTED', 'SOURCES', 'UNVERIFIED')
         except (OSError, ValueError, self.support['GatewayError']):
             return self._block('INPUT_OR_SOURCE_UNAVAILABLE', 'SOURCES', 'UNVERIFIED')

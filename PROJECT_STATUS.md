@@ -1,5 +1,7 @@
 # AI Deckbuilding Tool — Current Project Status
 
+**Runtime update (2026-11-07):** Official full AtomicCards automatic setup, private cache, export normalization and capability-based CLI are implemented. See [runtime acceptance](docs/FULL_ATOMIC_RUNTIME_ACCEPTANCE.md) for exact evidence and limitations. Strategy remains AI-authored.
+
 ## Current public checkout (2026-11-07)
 
 **Scope:** `PUBLIC_TEST_PREVIEW`, primarily Casual 60+ decks. This repository is an **AI support toolkit**, not a standalone Python deckbuilding algorithm. The AI selects cards and strategy.

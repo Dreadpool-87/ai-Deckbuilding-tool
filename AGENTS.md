@@ -4,6 +4,8 @@
 
 **Current public scope:** `PUBLIC_TEST_PREVIEW` for the Casual workflow. Private beta v0.2 acceptance is historical. Stable Builder v7.4 and Tester v3.4.2 are prompts, **not autonomous Python programs**. Swap Advisor work remains separate and on hold. MTG-AIO is a separate future, non-AI project.
 
+**AI host support:** Capability-based public test preview. Any Python-capable host can use the standard-library CLI; chat-only hosts must report `NOT_EXECUTED`. ChatGPT is the primary evaluated chat host, not an exclusive runtime dependency.
+
 **Chat-first entry:** When a user provides only the GitHub link or asks an AI to use this repository, begin with [START_HERE.md](START_HERE.md). Ask for the current collection CSV (`Name,Quantity`) only if it is not already accessible and confirmed for this run. Keep setup details behind an actual capability check; a repository link does not grant local execution. The AI selects all cards and strategy; Python tools verify evidence.
 
 ## A new agent must follow this order
@@ -17,6 +19,8 @@
 7. **Interpret limits accurately.** Tester v3.4.2 can analyze a frozen deck if requested, but is a **prompt-based analytical tester**, not an executed game engine. Only report genuinely executed numeric analyses. Forge Lite is optional external evidence, not a source of universal win rates.
 8. **Treat swaps as advice.** Do not present an unverified AI idea or a bounded Swap Advisor role witness as a proven `SWAP`. Mention pros, cons, prerequisites and unresolved assumptions; no automatic edits (`automatic_swap_authorized=false`). Swap Advisor integration requires a separate acceptance and integration approval.
 9. **Report concisely.** Give the deck(s), source/collection status, validation result, strategic rationale, known limitations and, if supported, proposed changes with trade-offs. Distinguish `FACT`, `DERIVATION` and `HYPOTHESIS`. Never claim to have executed a tool without its real output.
+
+**Required validation attempt in Python-capable environments:** Once a candidate is written and the inputs are locally available, run `python -m ai_deckbuilding_tool validate --collection <current-run-csv> --collection-confirmed --deck <ai-authored-deck>`. This first executes Gateway preflight, then the pinned Validator; use its actual JSON status, never an invented PASS. If validation fails, revise and rerun. If source files, pinned Oracle or execution access are missing, report the exact blocker and `NOT_EXECUTED`. The CLI automatically verifies/caches official full AtomicCards; it never chooses cards or bypasses host permissions. Run `python -m ai_deckbuilding_tool setup` to check setup independently. See [the quickstart](docs/AGENT_QUICKSTART.md#automatic-preflight-and-validation-entry-point).
 
 ## Runtime map
 

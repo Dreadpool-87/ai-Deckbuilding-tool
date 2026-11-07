@@ -223,7 +223,9 @@ __marimo__/
 /collecties/
 /collections/
 /collection/
-/data/
+/data/*
+!/data/README.md
+!/data/mtgjson_atomic_latest.json
 /mtgjson-build/
 *collectie*.csv
 *Collectie*.csv
@@ -245,3 +247,7 @@ report*.json
 
 # Keep generated gameplay data and local mirrors out of the repository.
 /forge-poc-output/
+
+# Local verified bulk snapshots are never repository deliverables.
+*.json.gz
+*.receipt.json

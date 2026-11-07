@@ -20,7 +20,7 @@ report = run.finalize()
 print(report)
 ```
 
-For real collections, use `scope="current-run-confirmed", confirmed=True` only after the user confirms that collection for this run. The Gateway still requires its exact frozen slim Oracle pin. Synthetic scope must use `confirmed=False`. The flag records the caller's declaration and cannot authenticate consent or physical ownership.
+For real collections, use `scope="current-run-confirmed", confirmed=True` only after the user confirms that collection for this run. For full AtomicCards, pass setup's `receipt_path` as `oracle_receipt` to `Workflow`, together with `archive_path` and `sha256`; the frozen slim profile remains supported. Synthetic scope must use `confirmed=False`. The flag records the caller's declaration and cannot authenticate consent or physical ownership.
 
 ## Stages and API
 

@@ -1,9 +1,9 @@
-name: Verify upstream MTGJSON AtomicCards (no mirror)
+name: Weekly MTGJSON AtomicCards verification and pointer proposal (no mirror)
 
 on:
   schedule:
-    # Monthly: day 1 at 07:17 UTC (manual dispatch is also available).
-    - cron: "17 7 1 * *"
+    # Every Sunday at 07:17 UTC. GitHub schedules can be delayed.
+    - cron: "17 7 * * 0"
   workflow_dispatch:
 
 permissions:
@@ -17,6 +17,10 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      manifest_b64: ${{ steps.export.outputs.manifest_b64 }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -28,16 +32,82 @@ jobs:
       - name: Verify official MTGJSON checksum, metadata and full JSON
         run: python scripts/update_mtgjson_atomic.py --output-dir "$RUNNER_TEMP/mtgjson-verification"
 
-      - name: Record metadata without republishing the data
+      - name: Export verified metadata only, never the archive
+        id: export
         shell: bash
         run: |
           set -euo pipefail
           manifest="$RUNNER_TEMP/mtgjson-verification/manifest.json"
           test -s "$manifest"
+          printf 'manifest_b64=%s\n' "$(base64 -w0 "$manifest")" >> "$GITHUB_OUTPUT"
           {
             echo "## Official MTGJSON AtomicCards verification"
             echo "Version: $(jq -er '.version' "$manifest")"
             echo "SHA-256: $(jq -er '.sha256' "$manifest")"
             echo "Source: https://mtgjson.com/api/v5/AtomicCards.json.gz"
+            echo "Only verified metadata is passed to the next job."
             echo "No dataset was committed, uploaded or republished."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  update-pointer:
+    if: github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Create or retain tiny verified pointer and SHA256SUMS entry
+        env:
+          VERIFIED_MANIFEST_B64: ${{ needs.verify.outputs.manifest_b64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$VERIFIED_MANIFEST_B64" | base64 --decode > "$RUNNER_TEMP/verified-manifest.json"
+          python scripts/record_mtgjson_atomic_pointer.py \
+            --verified-manifest "$RUNNER_TEMP/verified-manifest.json" \
+            --pointer data/mtgjson_atomic_latest.json \
+            --hash-manifest SHA256SUMS.txt \
+            --verified-at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+      - name: Propose a reviewed metadata-only pull request when changed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git add -- data/mtgjson_atomic_latest.json SHA256SUMS.txt
+          if git diff --cached --quiet; then
+            echo "The verified AtomicCards version and SHA-256 have not changed."
+            exit 0
+          fi
+          hash="$(jq -er '.sha256' data/mtgjson_atomic_latest.json)"
+          if ! [[ "$hash" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Invalid AtomicCards digest" >&2
+            exit 1
+          fi
+          branch="automation/mtgjson-atomic-${hash:0:16}"
+          if ! git ls-remote --heads origin "$branch" | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git switch -c "$branch"
+            git commit -m "chore: refresh verified MTGJSON AtomicCards pointer"
+            gh auth setup-git
+            git push origin "$branch"
+          fi
+          existing="$(gh pr list --base main --head "$branch" --state open --json number --jq 'length')"
+          if [ "$existing" = "0" ]; then
+            gh pr create --base main --head "$branch" \
+              --title "chore: refresh MTGJSON AtomicCards pointer" \
+              --body "Weekly verification detected a new official MTGJSON AtomicCards version or checksum. This change contains only an upstream URL, SHA-256, version, verification metadata and SHA256SUMS entry. No dataset is redistributed. Review before merging."
+          else
+            echo "Metadata pointer pull request is already open."
+          fi
