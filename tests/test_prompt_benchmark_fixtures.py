@@ -73,7 +73,13 @@ class PromptBenchmarkPreflight(unittest.TestCase):
                 self.assertEqual(report["status"], status)
                 self.assertEqual(report["child_exit_code"], child_code)
                 result = report["result"]
-                self.assertEqual(result["checks"]["ownership"], ownership)
+                # The identity-aware Validator withholds ownership for the
+                # conflicted physical Prepare card. The historical baseline
+                # still reported its narrower exact-name ledger as PASS.
+                expected_ownership = ("UNVERIFIED"
+                                      if prepare == "UNVERIFIED" and "identity_findings" in result
+                                      else ownership)
+                self.assertEqual(result["checks"]["ownership"], expected_ownership)
                 self.assertEqual(result["prepare_layout_audit"]["status"], prepare)
                 self.assertEqual(result["checks"]["mana_production_and_castability"], "NOT_CHECKED")
                 if prepare == "UNVERIFIED":
