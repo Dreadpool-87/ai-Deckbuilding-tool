@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch and verify official MTGJSON AtomicCards for a GitHub Release."""
+"""Verify official full AtomicCards temporarily; publish metadata only."""
 import argparse
 import gzip
 import hashlib
@@ -12,8 +12,16 @@ BASE = "https://mtgjson.com/api/v5/"
 ARCHIVE = "AtomicCards.json.gz"
 MAX_BYTES = 120 * 1024 * 1024
 
+def official_response(name, timeout=90):
+    result = urlopen(Request(BASE + name, headers={"User-Agent": "AI-Deckbuilding-Tool/1.0", "Cache-Control": "no-cache"}), timeout=timeout)
+    if result.geturl() != BASE + name:
+        result.close()
+        raise ValueError("Unexpected upstream redirect")
+    return result
+
+
 def fetch(name, limit=131072):
-    with urlopen(Request(BASE + name, headers={"User-Agent": "MTG-Deck-Tools/1.0"}), timeout=90) as response:
+    with official_response(name) as response:
         data = response.read(limit + 1)
     if len(data) > limit:
         raise ValueError("Unexpectedly large metadata: " + name)
@@ -43,6 +51,15 @@ def validate_data(payload, version):
         raise ValueError("Archive and Meta.json versions differ")
     return len(payload["data"])
 
+def ensure_upstream_snapshot_unchanged(version, checksum):
+    """Never record a moving 'latest' URL if MTGJSON changed mid-download."""
+    latest = json.loads(fetch("Meta.json"))
+    latest_version = latest.get("data", {}).get("version") if isinstance(latest, dict) else None
+    latest_checksum = parse_checksum(fetch(ARCHIVE + ".sha256"))
+    if latest_version != version or latest_checksum != checksum:
+        raise ValueError("MTGJSON upstream changed during verification; retry on next run")
+
+
 def prepare(out):
     out.mkdir(parents=True, exist_ok=True)
     meta = json.loads(fetch("Meta.json"))
@@ -54,7 +71,7 @@ def prepare(out):
     digest = hashlib.sha256()
     size = 0
     try:
-        with urlopen(Request(BASE + ARCHIVE, headers={"User-Agent": "MTG-Deck-Tools/1.0"}), timeout=180) as response:
+        with official_response(ARCHIVE, timeout=180) as response:
             with path.open("wb") as dest:
                 while block := response.read(1024 * 1024):
                     size += len(block)
@@ -64,8 +81,13 @@ def prepare(out):
                     dest.write(block)
         if size < 1024 * 1024 or digest.hexdigest() != checksum:
             raise ValueError("Download size/checksum verification failed")
-        with gzip.open(path, "rt", encoding="utf-8") as stream:
-            count = validate_data(json.load(stream), version)
+        # Reuse the runtime's bounded, strict full-record integrity check.
+        helper = Path(__file__).resolve().parents[1] / 'tools/atomic_runtime.py'
+        support = {'__name__': 'weekly_atomic_integrity'}
+        exec(compile(helper.read_bytes(), str(helper), 'exec'), support)
+        coverage = support['inspect_archive'](path, checksum, version)
+        count = coverage['card_names']
+        ensure_upstream_snapshot_unchanged(version, checksum)
     except Exception:
         path.unlink(missing_ok=True)
         raise

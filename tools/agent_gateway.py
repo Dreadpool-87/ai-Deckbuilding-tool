@@ -36,6 +36,7 @@ VALIDATOR_PROFILES = {
     "project-prepare-candidate": "c422295676d0bad04aa1449725b07a7c11bf58b7990a34aff209e10ba742ac8d",
     "frozen-beta-20261022": "8749b50d0aeaa52124a99271a0ab40bcc979350c6e8b5e9074c4f28d63a3d1ac",
 }
+ATOMIC_PIN = "afe61cacf143a6197fd99f36fa388c73105ac55dbaac8abe30d883f9cf84fe59"
 MAX_DATA = 128 * 1024 * 1024
 MAX_SMALL = 4 * 1024 * 1024
 MAX_STDOUT = 2 * 1024 * 1024
@@ -174,6 +175,20 @@ def _unchanged(paths: tuple[tuple[Path, str, int], ...], child_exit_code: int) -
                            child_exit_code=child_exit_code) from None
 
 
+def _official_snapshot(oracle, receipt_path, expected):
+    """Verify a local receipt and exact full snapshot using pinned helper bytes."""
+    _, code = _pinned_script(ROOT / 'tools/atomic_runtime.py', ATOMIC_PIN,
+                             'ATOMIC_RUNTIME_SHA256_MISMATCH')
+    support = {'__name__': 'gateway_atomic_support'}
+    exec(compile(code, '<pinned atomic runtime>', 'exec'), support)
+    try:
+        receipt = support['verify_receipt'](oracle, receipt_path, expected)
+    except (OSError, ValueError, EOFError, TypeError, KeyError):
+        raise GatewayError('OFFICIAL_SNAPSHOT_UNVERIFIED') from None
+    return {key: receipt[key] for key in ('version', 'sha256', 'download_url',
+                                         'checksum_url', 'verified_at_utc', 'card_names')}
+
+
 def _sources(args: argparse.Namespace, stage: Path, *, validate: bool
              ) -> tuple[Path, Path, Path | None, dict, tuple]:
     """Snapshot all child-tool inputs, verifying the Oracle snapshot itself."""
@@ -186,19 +201,28 @@ def _sources(args: argparse.Namespace, stage: Path, *, validate: bool
     oracle, observed = _snapshot_input(original_oracle, stage / oracle_name, MAX_DATA)
     if observed != args.oracle_sha256:
         raise GatewayError("ORACLE_SHA256_MISMATCH")
-    if args.collection_scope == "current-run-confirmed" and observed != ORACLE_PIN:
+    provenance = None
+    receipt_tracked = ()
+    if getattr(args, 'oracle_receipt', None):
+        original_receipt = _file(args.oracle_receipt, MAX_SMALL)
+        receipt, receipt_hash = _snapshot_input(original_receipt, stage / 'receipt.json', MAX_SMALL)
+        provenance = _official_snapshot(oracle, receipt, observed)
+        receipt_tracked = ((original_receipt, receipt_hash, MAX_SMALL),
+                           (ROOT / 'tools/atomic_runtime.py', ATOMIC_PIN, MAX_SMALL))
+    if args.collection_scope == "current-run-confirmed" and observed != ORACLE_PIN and provenance is None:
         raise GatewayError("ACTIVE_ORACLE_PIN_UNSUPPORTED")
     collection, collection_hash = _snapshot_input(
         original_collection, stage / "collection.csv", MAX_SMALL)
     deck, deck_hash = ((None, None) if original_deck is None else
                        _snapshot_input(original_deck, stage / "deck.txt", MAX_SMALL))
-    tracked = ((original_oracle, observed, MAX_DATA),
+    tracked = receipt_tracked + ((original_oracle, observed, MAX_DATA),
                (original_collection, collection_hash, MAX_SMALL))
     if original_deck is not None:
         tracked += ((original_deck, deck_hash, MAX_SMALL),)
     return oracle, collection, deck, {
         "oracle_sha256": observed,
-        "oracle_pin_basis": ("FROZEN_SLIM_PIN" if observed == ORACLE_PIN
+        "oracle_provenance": provenance,
+        "oracle_pin_basis": ("OFFICIAL_FULL_SNAPSHOT_RECEIPT" if provenance else "FROZEN_SLIM_PIN" if observed == ORACLE_PIN
                              else "CALLER_SPECIFIED_SYNTHETIC_TEST_PIN"),
         "collection_scope": args.collection_scope,
         "collection_sha256": collection_hash,
@@ -321,13 +345,15 @@ def _doctor(args: argparse.Namespace) -> tuple[str, dict]:
             checks["oracle"] = {
                 "status": "FILE_READABLE_NOT_RULES_VERIFIED",
                 "sha256": digest, "matches_slim_pin": digest == ORACLE_PIN,
+                "official_snapshot": (_official_snapshot(item, args.oracle_receipt, digest)
+                                      if getattr(args, "oracle_receipt", None) else None),
             }
         except GatewayError as exc:
             checks["oracle"] = {"status": "UNAVAILABLE", "reason": exc.reason}
     ready = (runtime_available and checks["card_search"]["pin_matches"]
              and checks["validator"]["pin_matches"]
              and checks["card_identity"]["pin_matches"]
-             and ("oracle" not in checks or checks["oracle"].get("matches_slim_pin") is True))
+             and ("oracle" not in checks or (checks["oracle"].get("matches_slim_pin") is True or bool(checks["oracle"].get("official_snapshot")))))
     return ("RUNTIME_COMPONENTS_PRESENT" if ready else "UNVERIFIED"), {
         "validator_profile": args.validator_profile,
         "validator_version": VALIDATOR_VERSION if checks["validator"]["pin_matches"] else None,
@@ -450,12 +476,14 @@ def _parser() -> argparse.ArgumentParser:
     subs = p.add_subparsers(dest="action", required=True, parser_class=_SafeParser)
     doctor = subs.add_parser("doctor", allow_abbrev=False)
     doctor.add_argument("--oracle")
+    doctor.add_argument("--oracle-receipt")
     doctor.add_argument("--validator-file")
     doctor.add_argument("--validator-profile", choices=tuple(VALIDATOR_PROFILES),
                         default=DEFAULT_VALIDATOR_PROFILE)
     for action in ("discover", "validate"):
         sub = subs.add_parser(action, allow_abbrev=False)
         sub.add_argument("--oracle", required=True)
+        sub.add_argument("--oracle-receipt")
         sub.add_argument("--oracle-sha256", default=ORACLE_PIN)
         sub.add_argument("--collection", required=True)
         sub.add_argument("--collection-scope", choices=("synthetic", "current-run-confirmed"), required=True)
