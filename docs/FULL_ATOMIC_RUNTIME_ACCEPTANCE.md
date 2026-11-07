@@ -30,9 +30,19 @@ Run all three unittest commands under Python 3.12 and 3.13. The opt-in full test
 
 These are dataset/runtime observations, not an accepted weekly pointer. The mutable upstream URL may serve different bytes later; every online setup independently rechecks official checksum/version. Local receipts provide integrity and recorded HTTPS provenance, not authentication against hostile same-user tampering. Offline use explicitly does not establish latest upstream freshness.
 
+## Combined acceptance evidence
+
+`python scripts/full_atomic_acceptance.py --cache-dir /private/atomic-cache --offline` exited 0 with `PASS_WITH_LIMITATIONS`. The controller reached `COMPLETE_WITH_EVIDENCE` through real discovery and validation replay; changing the deck produced `STALE` and removed the certificate. Online repeat setup exited 0 with `REUSED_VERIFIED`.
+
+Python 3.12 and 3.13 each passed 358 core tests, 6 Forge offline integration tests and 23 Spellbook offline tests. Workflow policy checks passed. The reachable-history heuristic scan reported `NO_PATTERN_HITS`, 282 blobs, no skipped oversized objects; this is not a proof about secrets in unreachable objects or external assets. An independent read-only review found and prompted a fix for nonofficial redirects in the weekly updater; its new negative test passes.
+
+Exact-head GitHub CI on integration head `885dcc01053cac795ef5a951550d62206b956879` passed: run `42380170108`, both Python jobs, workflow syntax and historical privacy scan. Its tree was independently compared with the tested local checkout and matched exactly.
+
 ## Weekly metadata policy
 
 The workflow runs Sundays at 07:17 UTC and supports manual dispatch. It verifies full temporary upstream data and publishes only version/hash/coverage metadata through a reviewed PR. No archive is a Git object, Release asset or Actions artifact. The small pointer is initialized only by verified evidence; unchanged version/hash causes no new commit.
+
+**Observed repository setting (2026-11-07):** The browser showed **Allow GitHub Actions to create and approve pull requests** unchecked. Default token permissions remain read-only. This is a confirmed blocker to automatic metadata PR creation; no permission setting was changed.
 
 Settings requirement: Repository **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests** must be enabled for `GITHUB_TOKEN` PR creation. Workflow job permissions alone cannot override this setting. A denied PR creation is an operational settings blocker, not successful publication. PRs created by `GITHUB_TOKEN` may not trigger other workflows automatically; review and explicitly run required checks before merging metadata updates.
 
