@@ -1,0 +1,215 @@
+{
+  "action": "validate",
+  "automatic_swap_authorized": false,
+  "card_search_sha256": null,
+  "child_exit_code": 0,
+  "collection_scope": "synthetic",
+  "collection_sha256": "20acee8a2191eee703338cc24098cb1e677d640fe27385603a3ec47497257b12",
+  "deck_sha256": "90cadc8cf79b8d4d0cca6a5e90d04d68b04ec24bb70d93cae6338253caaca191",
+  "evidence": {
+    "derivations": [
+      {
+        "basis": "PINNED_EXPLICIT_VALIDATOR_PROFILE",
+        "code": "CASUAL_VALIDATOR_OUTCOME",
+        "scope": "STRUCTURAL_VALIDATION_ONLY"
+      }
+    ],
+    "facts": [
+      {
+        "basis": "LOCAL_SHA256",
+        "code": "ORACLE_FILE_SHA256_MATCHED_REQUEST",
+        "scope": "INPUT_FILE_BYTES_NOT_CARD_RULES_PROOF"
+      }
+    ],
+    "hypotheses": []
+  },
+  "executed": true,
+  "gateway_version": "0.3.0-experimental",
+  "limitations": [
+    "This checks the stated deck and declared collection; collection confirmation is not authenticated.",
+    "Validation is not proof of strategic superiority, full legality, gameplay or castability."
+  ],
+  "oracle_pin_basis": "CALLER_SPECIFIED_SYNTHETIC_TEST_PIN",
+  "oracle_sha256": "0c012f9ba190c0a7903b91e9b1a07bc9d1de8d2dfd63b2149dbb484c0489f44c",
+  "ownership_authentication": "NOT_IMPLEMENTED",
+  "reason_codes": [],
+  "result": {
+    "card_types_overlapping": {
+      "Creature": 12,
+      "Instant": 16,
+      "Land": 24,
+      "Sorcery": 8
+    },
+    "card_types_primary_exclusive": {
+      "Creature": 12,
+      "Instant": 16,
+      "Land": 24,
+      "Sorcery": 8
+    },
+    "checks": {
+      "card_types": "PASS",
+      "commander_color_identity": "NOT_APPLICABLE",
+      "commander_count": "NOT_APPLICABLE",
+      "commander_eligibility": "NOT_APPLICABLE",
+      "copy_limit": "PASS",
+      "cross_deck_physical_assembly": "NOT_CHECKED",
+      "deck_parsing": "PASS",
+      "deck_size": "PASS",
+      "format_banlist": "NOT_CHECKED",
+      "land_probability": "PASS_EXACT",
+      "mana_curve": "PASS",
+      "mana_production_and_castability": "NOT_CHECKED",
+      "oracle_lookup": "PASS",
+      "ownership": "PASS",
+      "special_deckbuilding_exceptions": "NOT_CHECKED",
+      "synergy_and_gameplay": "NOT_CHECKED"
+    },
+    "collection_owned_copies": 84,
+    "collection_unique_names": 21,
+    "deck_cards": 60,
+    "failures": [],
+    "lands_physical": 24,
+    "limitations": [
+      "No gameplay/winrate/synergy verification",
+      "No format banlist or special card-text deck-size/copy exceptions",
+      "No mana availability/castability verification",
+      "No multi-commander rules or cross-deck allocation audit"
+    ],
+    "mana_curve_integrity": {
+      "average_mana_value_fraction": "26/9",
+      "average_mana_value_rounded": 2.889,
+      "bins": {
+        "0": 0,
+        "1": 8,
+        "2": 8,
+        "3": 8,
+        "4": 4,
+        "5": 8,
+        "6": 0,
+        "7+": 0
+      },
+      "ledger": [
+        {
+          "mana_value": 2,
+          "name": "Benchmark Deny",
+          "quantity": 4,
+          "weighted_mana_value": 8
+        },
+        {
+          "mana_value": 5,
+          "name": "Benchmark Drake",
+          "quantity": 4,
+          "weighted_mana_value": 20
+        },
+        {
+          "mana_value": 2,
+          "name": "Benchmark Exile",
+          "quantity": 4,
+          "weighted_mana_value": 8
+        },
+        {
+          "mana_value": 1,
+          "name": "Benchmark Peek",
+          "quantity": 4,
+          "weighted_mana_value": 4
+        },
+        {
+          "mana_value": 3,
+          "name": "Benchmark Purifier",
+          "quantity": 4,
+          "weighted_mana_value": 12
+        },
+        {
+          "mana_value": 1,
+          "name": "Benchmark Return",
+          "quantity": 4,
+          "weighted_mana_value": 4
+        },
+        {
+          "mana_value": 5,
+          "name": "Benchmark Seraph",
+          "quantity": 4,
+          "weighted_mana_value": 20
+        },
+        {
+          "mana_value": 3,
+          "name": "Benchmark Study",
+          "quantity": 4,
+          "weighted_mana_value": 12
+        },
+        {
+          "mana_value": 4,
+          "name": "Benchmark Sweep",
+          "quantity": 4,
+          "weighted_mana_value": 16
+        }
+      ],
+      "nonland_copies": 36,
+      "scope": "MTGJSON printed manaValue, nonlands only; unusual layouts require separate rules review",
+      "status": "ORACLE_ARITHMETIC_PASS",
+      "unresolved_mana_values": [],
+      "weighted_mana_value_total": 104
+    },
+    "mana_curve_nonlands": {
+      "1": 8,
+      "2": 8,
+      "3": 8,
+      "4": 4,
+      "5": 8
+    },
+    "mode": "casual",
+    "nonlands": 36,
+    "opening_7_exactly_2_to_5_physical_lands": {
+      "assumptions": "uniform random 7-card hand, no mulligan, physical lands only",
+      "fraction": "137172/162545",
+      "percentage": 84.390169
+    },
+    "oracle_version": "benchmark-v1",
+    "prepare_layout_audit": {
+      "scope": "Oracle face classification only; never asserts that a prepare spell was cast or its cost can be paid",
+      "status": "NOT_APPLICABLE",
+      "unverified_cards": {},
+      "verified_cards": {}
+    },
+    "printed_mana_costs": {
+      "Benchmark Deny": "{U}{U}",
+      "Benchmark Drake": "{3}{U}{U}",
+      "Benchmark Exile": "{1}{W}",
+      "Benchmark Peek": "{U}",
+      "Benchmark Purifier": "{2}{W}",
+      "Benchmark Return": "{U}",
+      "Benchmark Seraph": "{3}{W}{W}",
+      "Benchmark Study": "{2}{U}",
+      "Benchmark Sweep": "{2}{W}{W}",
+      "Benchmark WU Crossing": "",
+      "Island": "",
+      "Plains": ""
+    },
+    "status": "PASS_WITH_LIMITATIONS",
+    "uncertainties": [],
+    "unique_card_names": 12,
+    "warnings": []
+  },
+  "schema_version": 1,
+  "sources": {
+    "collection_scope": "synthetic",
+    "collection_sha256": "20acee8a2191eee703338cc24098cb1e677d640fe27385603a3ec47497257b12",
+    "deck_sha256": "90cadc8cf79b8d4d0cca6a5e90d04d68b04ec24bb70d93cae6338253caaca191",
+    "oracle_sha256": "0c012f9ba190c0a7903b91e9b1a07bc9d1de8d2dfd63b2149dbb484c0489f44c",
+    "ownership_authentication": "NOT_IMPLEMENTED",
+    "validator_profile": "github-main-v0.2",
+    "validator_sha256": "ffe3f958c342b70804941e6cec6604544d027cb8141aaf502f7749120f76bac0"
+  },
+  "status": "VALIDATED_WITH_LIMITATIONS",
+  "strategic_improvement_verified": false,
+  "tool_execution": "EXECUTED",
+  "uncertainties": [
+    "FULL_RULES_NOT_VERIFIED",
+    "OWNERSHIP_CONFIRMATION_NOT_AUTHENTICATED",
+    "STRATEGIC_IMPROVEMENT_UNVERIFIED",
+    "SWAP_NOT_ASSESSED"
+  ],
+  "validator_profile": "github-main-v0.2",
+  "validator_sha256": "ffe3f958c342b70804941e6cec6604544d027cb8141aaf502f7749120f76bac0",
+  "validator_version": "1.1.1"
+}
