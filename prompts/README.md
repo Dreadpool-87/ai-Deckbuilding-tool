@@ -13,6 +13,10 @@ This directory preserves **six established masterprompt versions plus two Englis
 | Tester v3.3 | [MTG_Deck_Tester_v3.3_full.md](casual/tester/MTG_Deck_Tester_v3.3_full.md) | English-output edition of the archived mobile upload |
 | **Tester v3.4.2** | [MTG_Deck_Tester_v3.4.2_full.md](casual/tester/MTG_Deck_Tester_v3.4.2_full.md) | **Latest Tester; English-output edition** |
 
+## Experimental compact comparison
+
+The [compact Builder](casual/builder/experimental/MTG_Deck_Builder_compact_candidate.md) and [compact Tester](casual/tester/experimental/MTG_Deck_Tester_compact_candidate.md) are comparison candidates only. The [fixed synthetic benchmark](../examples/prompt_benchmark/README.md) and [traceability matrix](../docs/PROMPT_CANDIDATE_TRACEABILITY.md) document what is covered and what remains **NOT_VERIFIED**. Active Builder v7.4 and Tester v3.4.2 are unchanged.
+
 ## Alpha handoff: Python mana-curve facts for Casual Builder + Tester
 
 The [shared Validator handoff](casual/SHARED_PYTHON_VALIDATOR_HANDOFF.md) contains a short, copyable ChatGPT Project instruction and the existing Validator CLI invocation. It **does not** edit the Tester v3.4.2 prompt or silently enable execution in ChatGPT. The user must apply the Project instruction manually; each run must verify file access and actual execution.

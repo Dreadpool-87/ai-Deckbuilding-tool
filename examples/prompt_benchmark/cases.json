@@ -1,0 +1,20 @@
+[
+  {"id":"B01-aggro","colors":"R","theme":"aggro","task":"Build exactly 60 cards of mono-red 1v1 aggro. Select reach without sacrificing early pressure."},
+  {"id":"B02-midrange","colors":"BG","theme":"midrange","task":"Build exactly 60 cards of black-green 1v1 midrange. Compare stabilization and closing plans."},
+  {"id":"B03-control","colors":"WU","theme":"control","task":"Build exactly 60 cards of white-blue 1v1 control. Prioritize timely answers and a real finisher."},
+  {"id":"B04-elves","colors":"G","theme":"tribal","task":"Build exactly 60 mono-green cards around Elf subtype. Explain enablers, payoffs and recovery."},
+  {"id":"B05-lifegain","colors":"WB","theme":"lifegain","task":"Build exactly 60 white-black cards around lifegain for an unspecified 2v2 variant."},
+  {"id":"B06-sacrifice","colors":"BG","theme":"sacrifice","task":"Build exactly 60 black-green sacrifice/graveyard cards to face two separate opponents in 1v2."},
+  {"id":"B07-multiface","colors":"UR","theme":"tempo","variant":"transform","task":"Build exactly 60 blue-red tempo cards. Include two copies of Benchmark Pupil // Benchmark Nightwing if confirmed owned and valid. Explain how it counts in the curve."},
+  {"id":"B08-prepare","colors":"WG","theme":"midrange","variant":"prepare","task":"Build exactly 60 white-green cards and include two Benchmark Sentinel // Benchmark Insight if verified. Explain which face supplies the printed creature curve and what a Prepare audit can prove."},
+  {"id":"B09-restricted","colors":"R","theme":"aggro","variant":"reduced","task":"Build exactly 60 mono-red aggro cards from this latest collection; it replaces any earlier one. Include as many Benchmark Sparks as the confirmed quantity allows."},
+  {"id":"B10-ambiguity","colors":"UR","theme":"tempo","variant":"ambiguous","task":"Build exactly 60 blue-red cards. Resolve 'Benchmark Pupil' from the collection before making any ownership claim for it; do not assume which face entry the seller meant."},
+  {"id":"B11-simultaneous","colors":"R","theme":"aggro","variant":"two","task":"Build two exactly 60-card mono-red decks to assemble physically at the same time. Each must have at least 30 nonlands. Allocate copies jointly."},
+  {"id":"B12-contradictory","colors":"WG","theme":"midrange","variant":"contradictory","task":"Build exactly 60 white-green cards. I prefer Benchmark Sentinel // Benchmark Insight if you can verify it; report unresolved issues and do not treat an invalid audit as a pass."},
+  {"id":"B13-independent","colors":"R","theme":"aggro","variant":"two","task":"Build two distinct, independently optimized exactly 60-card mono-red alternatives (no simultaneous assembly). Each must have at least 30 nonlands. Report possible shared-card shortages."},
+  {"id":"B14-runtime-unavailable","colors":"R","theme":"aggro","variant":"no-tools","task":"Build exactly 60 mono-red aggro cards. The visible collection is confirmed, but this session has no runnable tools or readable Oracle file. Say what can actually be verified."},
+  {"id":"T01-standard","colors":"WU","theme":"control","variant":"tester-control","task":"STANDARD: assess the unchanged 60-card control list, confirm curve and ownership, and distinguish early white and double-blue requirements. Give supported exact diagnostics and concise tactical guidance."},
+  {"id":"T02-shortage","colors":"R","theme":"aggro","variant":"tester-shortage","task":"QUICK: assess the frozen list; show how the two distinct Benchmark Spark printing rows affect ownership. Do not change the deck."},
+  {"id":"T03-sequencing","colors":"WU","theme":"control","variant":"tester-control","task":"DEEP: analyze the frozen deck. Test whether Benchmark Deny is payable on turn two, and explain whether a hand with only one Benchmark WU Crossing can pay {U}{U} on turn one. If you cannot validate the sequencing model, still give supported findings."},
+  {"id":"T04-prepare","colors":"WG","theme":"midrange","variant":"tester-prepare","task":"STANDARD: assess the frozen list with the contradictory Prepare records. Reconcile mana-curve/ownership only to the extent supportable and explain any blocked completion."}
+]
