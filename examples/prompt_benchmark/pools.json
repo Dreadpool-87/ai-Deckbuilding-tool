@@ -1,0 +1,62 @@
+{
+  "W": [
+    ["Warden", "W", "Creature", "Human Cleric", "Whenever another creature you control enters, you gain 1 life.", "1/1"],
+    ["Initiate", "W", "Creature", "Human Soldier", "Vigilance.", "2/1"],
+    ["Exile", "1W", "Instant", "", "Exile target attacking or blocking creature."],
+    ["Cleric", "1W", "Creature", "Human Cleric", "Lifelink.", "2/2"],
+    ["Ascendant", "1W", "Creature", "Cat", "Whenever you gain life, put a +1/+1 counter on this creature.", "2/2"],
+    ["Rally", "2W", "Sorcery", "", "Create two 1/1 white Soldier creature tokens."],
+    ["Purifier", "2W", "Creature", "Human", "When this creature enters, destroy up to one target artifact or enchantment.", "2/2"],
+    ["Sweep", "2WW", "Sorcery", "", "Destroy all creatures."],
+    ["Seraph", "3WW", "Creature", "Angel", "Flying, lifelink.", "4/4"],
+    ["Restoration", "3W", "Sorcery", "", "Return up to two target creature cards with mana value 2 or less from your graveyard to the battlefield."]
+  ],
+  "U": [
+    ["Peek", "U", "Sorcery", "", "Scry 2, then draw a card."],
+    ["Deny", "UU", "Instant", "", "Counter target spell."],
+    ["Return", "U", "Instant", "", "Return target creature to its owner's hand."],
+    ["Seer", "1U", "Creature", "Human Wizard", "When this creature enters, draw a card, then discard a card.", "1/3"],
+    ["Study", "2U", "Instant", "", "Draw two cards."],
+    ["Dispel", "2U", "Instant", "", "Counter target noncreature spell."],
+    ["Recall", "2UU", "Sorcery", "", "Return all creatures to their owners' hands."],
+    ["Watcher", "2U", "Creature", "Bird", "Flying.", "3/2"],
+    ["Drake", "3UU", "Creature", "Drake", "Flying. When this creature enters, draw a card.", "4/4"],
+    ["Engine", "5UU", "Creature", "Sphinx", "Flying. At the beginning of your upkeep, draw two cards.", "5/5"]
+  ],
+  "B": [
+    ["Offering", "B", "Sorcery", "", "As an additional cost to cast this spell, sacrifice a creature. Draw two cards."],
+    ["Acolyte", "B", "Creature", "Human Cleric", "When this creature dies, each opponent loses 1 life and you gain 1 life.", "1/1"],
+    ["Rite", "1B", "Instant", "", "Destroy target nonartifact creature."],
+    ["Thrall", "1B", "Creature", "Zombie", "When this creature dies, create a tapped 2/2 black Zombie creature token.", "1/1"],
+    ["Collector", "1B", "Creature", "Human", "Whenever another creature you control dies, each opponent loses 1 life and you gain 1 life.", "2/2"],
+    ["Restore", "2B", "Sorcery", "", "Return target creature card from your graveyard to the battlefield."],
+    ["Sifter", "2B", "Creature", "Human", "Sacrifice another creature: Scry 1.", "3/2"],
+    ["Unmake", "1BB", "Sorcery", "", "Exile target creature or planeswalker."],
+    ["Stalker", "2BB", "Creature", "Vampire", "Menace. Whenever you gain life, each opponent loses 1 life.", "3/4"],
+    ["Harvester", "3BB", "Creature", "Demon", "Flying. When this creature enters, each player sacrifices a creature.", "5/4"]
+  ],
+  "R": [
+    ["Runner", "R", "Creature", "Goblin", "Haste.", "2/1"],
+    ["Spark", "R", "Instant", "", "This spell deals 2 damage to any target."],
+    ["Raider", "R", "Creature", "Human", "This creature can't block.", "2/1"],
+    ["Breaker", "1R", "Creature", "Goblin", "Whenever this creature attacks, it gets +1/+0 until end of turn.", "2/2"],
+    ["Blaze", "RR", "Instant", "", "This spell deals 3 damage to any target."],
+    ["Volley", "1R", "Instant", "", "This spell deals 4 damage to target creature."],
+    ["Skirmish", "2R", "Sorcery", "", "Create two 1/1 red Goblin creature tokens with haste."],
+    ["Rupture", "2R", "Sorcery", "", "Destroy target artifact."],
+    ["Glider", "3R", "Creature", "Phoenix", "Flying, haste.", "3/2"],
+    ["Meteor", "5RR", "Sorcery", "", "This spell deals 6 damage to each opponent."]
+  ],
+  "G": [
+    ["Scout", "G", "Creature", "Elf Druid", "{T}: Add {G}.", "1/1"],
+    ["Archer", "G", "Creature", "Elf Archer", "Reach.", "1/2"],
+    ["Leader", "1G", "Creature", "Elf Warrior", "Other Elves you control get +1/+1.", "2/2"],
+    ["Gathering", "1G", "Sorcery", "", "Create two 1/1 green Elf Warrior creature tokens."],
+    ["Reclaimer", "1G", "Creature", "Elf Druid", "When this creature enters, return target card from your graveyard to your hand.", "1/2"],
+    ["Shatter", "1G", "Instant", "", "Destroy target artifact or enchantment."],
+    ["Hunt", "2G", "Sorcery", "", "Target creature you control fights target creature you don't control."],
+    ["Companion", "2G", "Creature", "Elf Warrior", "When this creature enters, draw a card if you control another Elf.", "3/2"],
+    ["Beast", "2GG", "Creature", "Beast", "Trample.", "5/4"],
+    ["Surge", "3GG", "Sorcery", "", "Creatures you control get +3/+3 and gain trample until end of turn."]
+  ]
+}

@@ -1,0 +1,220 @@
+{
+  "action": "validate",
+  "automatic_swap_authorized": false,
+  "card_search_sha256": null,
+  "child_exit_code": 0,
+  "collection_scope": "synthetic",
+  "collection_sha256": "8b0bd0c5112e1bed20ed81ff385b29b02bad88362445d4b321f0ec787c6b7b40",
+  "deck_sha256": "9cd9eb242d6208301505788da2ae406f0ea96cc44acd66d30795d2360e2ecbfc",
+  "evidence": {
+    "derivations": [
+      {
+        "basis": "PINNED_EXPLICIT_VALIDATOR_PROFILE",
+        "code": "CASUAL_VALIDATOR_OUTCOME",
+        "scope": "STRUCTURAL_VALIDATION_ONLY"
+      }
+    ],
+    "facts": [
+      {
+        "basis": "LOCAL_SHA256",
+        "code": "ORACLE_FILE_SHA256_MATCHED_REQUEST",
+        "scope": "INPUT_FILE_BYTES_NOT_CARD_RULES_PROOF"
+      }
+    ],
+    "hypotheses": []
+  },
+  "executed": true,
+  "gateway_version": "0.3.0-experimental",
+  "limitations": [
+    "This checks the stated deck and declared collection; collection confirmation is not authenticated.",
+    "Validation is not proof of strategic superiority, full legality, gameplay or castability."
+  ],
+  "oracle_pin_basis": "CALLER_SPECIFIED_SYNTHETIC_TEST_PIN",
+  "oracle_sha256": "e6eb4182d0474f6bf4691f487376b4b3f1e9435264252488aed77189a1c4d426",
+  "ownership_authentication": "NOT_IMPLEMENTED",
+  "reason_codes": [],
+  "result": {
+    "card_types_overlapping": {
+      "Creature": 22,
+      "Instant": 3,
+      "Land": 24,
+      "Sorcery": 11
+    },
+    "card_types_primary_exclusive": {
+      "Creature": 22,
+      "Instant": 3,
+      "Land": 24,
+      "Sorcery": 11
+    },
+    "checks": {
+      "card_types": "PASS",
+      "commander_color_identity": "NOT_APPLICABLE",
+      "commander_count": "NOT_APPLICABLE",
+      "commander_eligibility": "NOT_APPLICABLE",
+      "copy_limit": "PASS",
+      "cross_deck_physical_assembly": "NOT_CHECKED",
+      "deck_parsing": "PASS",
+      "deck_size": "PASS",
+      "format_banlist": "NOT_CHECKED",
+      "land_probability": "PASS_EXACT",
+      "mana_curve": "PASS",
+      "mana_production_and_castability": "NOT_CHECKED",
+      "oracle_lookup": "PASS",
+      "ownership": "PASS",
+      "special_deckbuilding_exceptions": "NOT_CHECKED",
+      "synergy_and_gameplay": "NOT_CHECKED"
+    },
+    "collection_owned_copies": 40,
+    "collection_unique_names": 10,
+    "deck_cards": 60,
+    "failures": [],
+    "lands_physical": 24,
+    "limitations": [
+      "No gameplay/winrate/synergy verification",
+      "No format banlist or special card-text deck-size/copy exceptions",
+      "No mana availability/castability verification",
+      "No multi-commander rules or cross-deck allocation audit"
+    ],
+    "mana_curve_integrity": {
+      "average_mana_value_fraction": "85/36",
+      "average_mana_value_rounded": 2.361,
+      "bins": {
+        "0": 0,
+        "1": 8,
+        "2": 15,
+        "3": 8,
+        "4": 2,
+        "5": 3,
+        "6": 0,
+        "7+": 0
+      },
+      "ledger": [
+        {
+          "mana_value": 1,
+          "name": "Benchmark Archer",
+          "quantity": 4,
+          "weighted_mana_value": 4
+        },
+        {
+          "mana_value": 4,
+          "name": "Benchmark Beast",
+          "quantity": 2,
+          "weighted_mana_value": 8
+        },
+        {
+          "mana_value": 3,
+          "name": "Benchmark Companion",
+          "quantity": 4,
+          "weighted_mana_value": 12
+        },
+        {
+          "mana_value": 2,
+          "name": "Benchmark Gathering",
+          "quantity": 4,
+          "weighted_mana_value": 8
+        },
+        {
+          "mana_value": 3,
+          "name": "Benchmark Hunt",
+          "quantity": 4,
+          "weighted_mana_value": 12
+        },
+        {
+          "mana_value": 2,
+          "name": "Benchmark Leader",
+          "quantity": 4,
+          "weighted_mana_value": 8
+        },
+        {
+          "mana_value": 2,
+          "name": "Benchmark Reclaimer",
+          "quantity": 4,
+          "weighted_mana_value": 8
+        },
+        {
+          "mana_value": 1,
+          "name": "Benchmark Scout",
+          "quantity": 4,
+          "weighted_mana_value": 4
+        },
+        {
+          "mana_value": 2,
+          "name": "Benchmark Shatter",
+          "quantity": 3,
+          "weighted_mana_value": 6
+        },
+        {
+          "mana_value": 5,
+          "name": "Benchmark Surge",
+          "quantity": 3,
+          "weighted_mana_value": 15
+        }
+      ],
+      "nonland_copies": 36,
+      "scope": "MTGJSON printed manaValue, nonlands only; unusual layouts require separate rules review",
+      "status": "ORACLE_ARITHMETIC_PASS",
+      "unresolved_mana_values": [],
+      "weighted_mana_value_total": 85
+    },
+    "mana_curve_nonlands": {
+      "1": 8,
+      "2": 15,
+      "3": 8,
+      "4": 2,
+      "5": 3
+    },
+    "mode": "casual",
+    "nonlands": 36,
+    "opening_7_exactly_2_to_5_physical_lands": {
+      "assumptions": "uniform random 7-card hand, no mulligan, physical lands only",
+      "fraction": "137172/162545",
+      "percentage": 84.390169
+    },
+    "oracle_version": "benchmark-v1",
+    "prepare_layout_audit": {
+      "scope": "Oracle face classification only; never asserts that a prepare spell was cast or its cost can be paid",
+      "status": "NOT_APPLICABLE",
+      "unverified_cards": {},
+      "verified_cards": {}
+    },
+    "printed_mana_costs": {
+      "Benchmark Archer": "{G}",
+      "Benchmark Beast": "{2}{G}{G}",
+      "Benchmark Companion": "{2}{G}",
+      "Benchmark Gathering": "{1}{G}",
+      "Benchmark Hunt": "{2}{G}",
+      "Benchmark Leader": "{1}{G}",
+      "Benchmark Reclaimer": "{1}{G}",
+      "Benchmark Scout": "{G}",
+      "Benchmark Shatter": "{1}{G}",
+      "Benchmark Surge": "{3}{G}{G}",
+      "Forest": ""
+    },
+    "status": "PASS_WITH_LIMITATIONS",
+    "uncertainties": [],
+    "unique_card_names": 11,
+    "warnings": []
+  },
+  "schema_version": 1,
+  "sources": {
+    "collection_scope": "synthetic",
+    "collection_sha256": "8b0bd0c5112e1bed20ed81ff385b29b02bad88362445d4b321f0ec787c6b7b40",
+    "deck_sha256": "9cd9eb242d6208301505788da2ae406f0ea96cc44acd66d30795d2360e2ecbfc",
+    "oracle_sha256": "e6eb4182d0474f6bf4691f487376b4b3f1e9435264252488aed77189a1c4d426",
+    "ownership_authentication": "NOT_IMPLEMENTED",
+    "validator_profile": "github-main-v0.2",
+    "validator_sha256": "ffe3f958c342b70804941e6cec6604544d027cb8141aaf502f7749120f76bac0"
+  },
+  "status": "VALIDATED_WITH_LIMITATIONS",
+  "strategic_improvement_verified": false,
+  "tool_execution": "EXECUTED",
+  "uncertainties": [
+    "FULL_RULES_NOT_VERIFIED",
+    "OWNERSHIP_CONFIRMATION_NOT_AUTHENTICATED",
+    "STRATEGIC_IMPROVEMENT_UNVERIFIED",
+    "SWAP_NOT_ASSESSED"
+  ],
+  "validator_profile": "github-main-v0.2",
+  "validator_sha256": "ffe3f958c342b70804941e6cec6604544d027cb8141aaf502f7749120f76bac0",
+  "validator_version": "1.1.1"
+}
