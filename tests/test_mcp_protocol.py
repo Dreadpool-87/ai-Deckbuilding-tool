@@ -1,5 +1,6 @@
 """Actual MCP protocol smoke. Skipped by default without optional mcp SDK."""
 import importlib.util
+import json
 import unittest
 
 
@@ -18,10 +19,13 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
                 'theme': 'burn',
                 'confirmed': False,
             })
-            print('MCP_DIAGNOSTIC', repr(result), flush=True)
-            self.assertEqual(result.structured_content['status'], 'UNVERIFIED')
+            self.assertFalse(result.is_error)
+            # The MCP v2 SDK returns arbitrary dict tool outputs as JSON text.
+            # Do not assume the optional structured_content channel exists.
+            payload = result.structured_content or json.loads(result.content[0].text)
+            self.assertEqual(payload['status'], 'UNVERIFIED')
             self.assertIn('CURRENT_RUN_COLLECTION_CONFIRMATION_REQUIRED',
-                          result.structured_content['reason_codes'])
+                          payload['reason_codes'])
 
     async def test_bearer_gate_denies_unauthenticated_requests(self):
         from integrations.mcp.server import BearerGate
