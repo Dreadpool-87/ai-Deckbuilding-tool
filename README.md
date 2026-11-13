@@ -16,9 +16,11 @@ Give an AI assistant this repository URL or the dedicated [chat-first starter](S
 
 The link alone does not give an AI access to Python, source files or the verified Oracle dataset. If those cannot actually be loaded, the assistant must say so rather than inventing validation results. This is a public test preview, not a hosted one-click deckbuilding service.
 
-## MTGJSON data freshness (no redistribution)
+## MTGJSON data freshness and the public slim snapshot
 
-[Weekly AtomicCards verification](.github/workflows/mtgjson-atomic-update.yml) runs every **Sunday at 07:17 UTC**. It verifies the complete official MTGJSON download in temporary runner storage, and proposes a reviewed PR containing only [the official URL, version and SHA-256 pointer](data/README.md) when the version or digest changes. **No MTGJSON card archive is stored in Git history, GitHub Releases or Actions artifacts.** The official download URL is mutable; verify every downloaded archive against the current upstream checksum. This pointer does not yet activate full-AtomicCards support in the existing real-collection Gateway.
+[Weekly AtomicCards verification](.github/workflows/mtgjson-atomic-update.yml) runs every **Sunday at 07:17 UTC**. It verifies the complete official MTGJSON download in temporary runner storage, and proposes a reviewed PR containing only [the official URL, version and SHA-256 pointer](data/README.md) when the version or digest changes. **No full AtomicCards archive is stored in Git history, GitHub Releases or Actions artifacts.** The official download URL is mutable; verify every downloaded archive against the current upstream checksum. This pointer does not yet activate full-AtomicCards support in the existing real-collection Gateway.
+
+By explicit owner decision (2026-11-13), the frozen slim AllPrintings SQLite snapshot (MTGJSON 5.3.0+20261107) is distributed publicly as a [GitHub Release asset](https://github.com/Dreadpool-87/ai-Deckbuilding-tool/releases/tag/allprintings-slim-20261107) with its SHA-256 checksum and the MTGJSON MIT notice. See [data/README.md](data/README.md) for download and verification instructions. The ~218 MB extracted database is never committed to Git history.
 ## One-command validation for Python-capable AI hosts (experimental)
 
 After the AI has authored a deck, it should **attempt the real Validator before presenting a validated result**, instead of stopping at a manual card-count check. The new standard-library CLI automatically runs Gateway preflight and then delegates to the pinned Gateway. In a local checkout:
