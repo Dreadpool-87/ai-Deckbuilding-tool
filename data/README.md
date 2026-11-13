@@ -1,9 +1,7 @@
 # MTGJSON data: weekly pointer and public slim snapshot
 
 AI Deckbuilding Tool keeps the **full AtomicCards** database hosted by MTGJSON
-and never stores it in Git history, GitHub Releases or Actions artifacts. The
-frozen **slim** AllPrintings SQLite snapshot, however, is now distributed
-publicly as a GitHub Release asset by explicit owner decision (see below).
+and never stores it in Git history, GitHub Releases or Actions artifacts. The frozen slim AllPrintings SQLite snapshot is also **not currently publicly distributed** by this repository; the earlier public Release was removed pending a third-party rights review.
 
 Every Sunday at 07:17 UTC, the repository's
 [official upstream verification workflow](../.github/workflows/mtgjson-atomic-update.yml)
@@ -37,41 +35,21 @@ mismatch. For newly downloaded latest data, check MTGJSON's official
 `.sha256` file as well; the weekly pointer is an audit record, not a
 replacement for live checksum verification.
 
-## Public slim AllPrintings SQLite snapshot (policy change, 2026-11-13)
+## Frozen slim AllPrintings SQLite snapshot (distribution pending rights review)
 
-On 2026-11-13 the project owner changed the previous no-redistribution policy
-for the frozen slim test database: the exact compressed snapshot
-`AllPrintings_slim_07Nov.sqlite.xz` is published as a **GitHub Release asset**
-of [release `allprintings-slim-20261107`](https://github.com/Dreadpool-87/ai-Deckbuilding-tool/releases/tag/allprintings-slim-20261107).
+The previous public Release `allprintings-slim-20261107` was removed. **Do not rely on its former URL or use `gh release download` against it.** No public download of the frozen slim snapshot is currently provided by this repository. Publishing the archive again requires a separate review of rights in Wizards of the Coast card text; the MTGJSON MIT notice alone is not proof of those rights.
 
-Download and verify:
+Recorded identification for the **unpublished** archive:
 
-```sh
-gh release download allprintings-slim-20261107 --repo Dreadpool-87/ai-Deckbuilding-tool --pattern "AllPrintings_slim_07Nov.sqlite.xz*"
-sha256sum -c AllPrintings_slim_07Nov.sqlite.xz.sha256
-```
+- Filename: `AllPrintings_slim_07Nov.sqlite.xz`
+- Source: MTGJSON AllPrintings 5.3.0+20261107, frozen slim schema (including `cards.printedName` and `facePrintedName`)
+- Expected compressed size: **45,020,048 bytes**
+- Expected compressed SHA-256: `9bc865c411a142801812e3df0d0ad1aed5cc792c055205592851b4b66c968af1`
+- Extracted SQLite: approximately 218 MiB; never commit it to Git history
 
-Expected SHA-256 of the compressed archive:
+These recorded values identify the historical archive; they are **not a verification of a currently downloadable public asset**. If an authorized user already has the archive locally, they can verify it using `sha256sum AllPrintings_slim_07Nov.sqlite.xz` and compare the output to the expected digest above. Do not substitute a different MTGJSON version and assume the same checksum.
 
-```text
-9bc865c411a142801812e3df0d0ad1aed5cc792c055205592851b4b66c968af1
-```
-
-Facts and limits of this snapshot:
-
-- Derived from MTGJSON AllPrintings **5.3.0+20261107** (2026-11-07); slim schema
-  with `cards.printedName` and `facePrintedName` retained
-- **Frozen**: it does not track upstream MTGJSON updates; the weekly pointer
-  workflow above remains the freshness mechanism for AtomicCards
-- The ~218 MB extracted SQLite file is intentionally **never committed to Git
-  history**; the archive exists only as the Release asset
-- The release carries the MTGJSON MIT license notice as an asset
-  (`MTGJSON-MIT.txt`), satisfying the attribution condition of the
-  [MTGJSON license](https://mtgjson.com/license/)
-
-The Gateway retains this frozen **slim** test profile, while production
-runtime setup separately supports the verified official **full AtomicCards**
-database. The weekly pointer does not replace live upstream checksums.
+For a publicly accessible upstream data source, use the official [MTGJSON API](https://mtgjson.com/api/v5/) and verify each downloaded archive against its matching official checksum. The weekly AtomicCards pointer is an audit record, not a stable archived download. The Gateway's frozen slim test profile is distinct from the verified official full AtomicCards setup.
 
 **Permission prerequisite:** GitHub may require enabling
 Settings → Actions → General → **Allow GitHub Actions to create and approve
