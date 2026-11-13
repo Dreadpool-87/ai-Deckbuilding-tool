@@ -1,7 +1,9 @@
-# Verified MTGJSON AtomicCards pointer
+# MTGJSON data: weekly pointer and public slim snapshot
 
-AI Deckbuilding Tool **does not redistribute MTGJSON card archives**. The full
-AtomicCards database remains hosted by MTGJSON.
+AI Deckbuilding Tool keeps the **full AtomicCards** database hosted by MTGJSON
+and never stores it in Git history, GitHub Releases or Actions artifacts. The
+frozen **slim** AllPrintings SQLite snapshot, however, is now distributed
+publicly as a GitHub Release asset by explicit owner decision (see below).
 
 Every Sunday at 07:17 UTC, the repository's
 [official upstream verification workflow](../.github/workflows/mtgjson-atomic-update.yml)
@@ -35,7 +37,39 @@ mismatch. For newly downloaded latest data, check MTGJSON's official
 `.sha256` file as well; the weekly pointer is an audit record, not a
 replacement for live checksum verification.
 
-The Gateway retains its frozen **slim** test profile, while production
+## Public slim AllPrintings SQLite snapshot (policy change, 2026-11-13)
+
+On 2026-11-13 the project owner changed the previous no-redistribution policy
+for the frozen slim test database: the exact compressed snapshot
+`AllPrintings_slim_07Nov.sqlite.xz` is published as a **GitHub Release asset**
+of [release `allprintings-slim-20261107`](https://github.com/Dreadpool-87/ai-Deckbuilding-tool/releases/tag/allprintings-slim-20261107).
+
+Download and verify:
+
+```sh
+gh release download allprintings-slim-20261107 --repo Dreadpool-87/ai-Deckbuilding-tool --pattern "AllPrintings_slim_07Nov.sqlite.xz*"
+sha256sum -c AllPrintings_slim_07Nov.sqlite.xz.sha256
+```
+
+Expected SHA-256 of the compressed archive:
+
+```text
+9bc865c411a142801812e3df0d0ad1aed5cc792c055205592851b4b66c968af1
+```
+
+Facts and limits of this snapshot:
+
+- Derived from MTGJSON AllPrintings **5.3.0+20261107** (2026-11-07); slim schema
+  with `cards.printedName` and `facePrintedName` retained
+- **Frozen**: it does not track upstream MTGJSON updates; the weekly pointer
+  workflow above remains the freshness mechanism for AtomicCards
+- The ~218 MB extracted SQLite file is intentionally **never committed to Git
+  history**; the archive exists only as the Release asset
+- The release carries the MTGJSON MIT license notice as an asset
+  (`MTGJSON-MIT.txt`), satisfying the attribution condition of the
+  [MTGJSON license](https://mtgjson.com/license/)
+
+The Gateway retains this frozen **slim** test profile, while production
 runtime setup separately supports the verified official **full AtomicCards**
 database. The weekly pointer does not replace live upstream checksums.
 

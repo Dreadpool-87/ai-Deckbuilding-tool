@@ -2,7 +2,7 @@
   "files": {
     "AGENTS.md": "a853ef7cc7b3e25df0f4bf48873587fd8caad6b63af6340a0b1d67e9490bc30c",
     "PROJECT_STATUS.md": "4d2fbd1ca354d366d12abdcce9643ef0b69cef84c3d26e9b2fc317f824047dd5",
-    "README.md": "66616f41eb5d82467ee09fd54e27588cd9fc97f97350c91c663d133ed24db037",
+    "README.md": "3104afefd109f4bc8916c44291e88b6e8e7fba9d18b17d2931db5e3d777441f3",
     "START_HERE.md": "7f2d78e5aa6ce68c210cdd8ceb3bd1240a06f9fdf50cc07aba390c391e37c056",
     "ai_deckbuilding_tool/__init__.py": "59fe24254cd679344e2bf8b5d4ca016d6f37a8b7cc1d60726fa747b8767e8969",
     "ai_deckbuilding_tool/__main__.py": "c07a63ca4587e7ed6185819444a1de3da1dbcf38d178e94bd21aa449fcb2eb3e",
