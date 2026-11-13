@@ -18,6 +18,7 @@ class ProtocolTests(unittest.IsolatedAsyncioTestCase):
                 'theme': 'burn',
                 'confirmed': False,
             })
+            print('MCP_DIAGNOSTIC', repr(result), flush=True)
             self.assertEqual(result.structured_content['status'], 'UNVERIFIED')
             self.assertIn('CURRENT_RUN_COLLECTION_CONFIRMATION_REQUIRED',
                           result.structured_content['reason_codes'])
